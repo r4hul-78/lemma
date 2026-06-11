@@ -146,7 +146,7 @@ python -m pytest backend/tests/
 ## 🗺️ Build Roadmap
 
 * [x] **Phase 1**: Core Ingestion, Parsing Service & spaCy Coordinate Segmenter
-* [ ] **Phase 2**: TF-IDF Matrix & Semantic Embeddings Dual Matching Engine
+* [x] **Phase 2**: TF-IDF Matrix & Semantic Embeddings Dual Matching Engine
 * [ ] **Phase 3**: Celery Asynchronous Job Queues & Redis Integration
 * [x] **Phase 4 (Refactored)**: Stark dark-theme Frontend with Interactive 3D Canvas animation (Completed ahead of matchers to bootstrap UI)
 * [ ] **Phase 5**: WeasyPrint PDF Generation & End-to-End Verification

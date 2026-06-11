@@ -1,14 +1,46 @@
 import io
 import pytest
-from fastapi.testclient import TestClient
+from pathlib import Path
 from docx import Document
+
+# Override settings to use a test database and index BEFORE importing app or other components
+from backend.app.config import settings
+TEST_DB_PATH = settings.BASE_DIR / "data" / "test_lemma.db"
+TEST_INDEX_PATH = settings.BASE_DIR / "data" / "test_lemma_vectors.index"
+
+settings.SQLITE_DB_PATH = TEST_DB_PATH
+settings.FAISS_INDEX_PATH = TEST_INDEX_PATH
+
+from fastapi.testclient import TestClient
 from backend.app.main import app
+
+@pytest.fixture(scope="session", autouse=True)
+def clean_test_db_and_index():
+    """Ensures test database and index files are cleaned up before and after the test session."""
+    # Setup: remove any existing test database or index files
+    for p in (TEST_DB_PATH, TEST_INDEX_PATH):
+        if p.exists():
+            try:
+                p.unlink()
+            except Exception:
+                pass
+                
+    yield
+    
+    # Teardown: clean up test database and index files
+    for p in (TEST_DB_PATH, TEST_INDEX_PATH):
+        if p.exists():
+            try:
+                p.unlink()
+            except Exception:
+                pass
 
 @pytest.fixture(scope="module")
 def client():
     """Provides a FastAPI TestClient."""
     with TestClient(app) as c:
         yield c
+
 
 @pytest.fixture
 def sample_text():

@@ -63,9 +63,6 @@
                     <p>Analyze your academic documents for lexical and semantic integrity.</p>
                 </div>
                 <div class="header-profile">
-                    <button class="theme-toggle" id="theme-toggle-btn" aria-label="Toggle theme">
-                        <i class="fa-solid fa-moon"></i>
-                    </button>
                     <div class="profile-avatar">R</div>
                 </div>
             </header>
@@ -151,6 +148,20 @@
                                 <div class="value-container" id="plagiarism-score-text">0%</div>
                             </div>
                             <span class="progress-desc">Lexical & Semantic Match Score</span>
+                            <div class="progress-legend" id="progress-legend">
+                                <div class="legend-item">
+                                    <span class="legend-color legend-lexical"></span>
+                                    <span>Lexical: <strong id="legend-val-lexical">0%</strong></span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color legend-semantic"></span>
+                                    <span>Semantic: <strong id="legend-val-semantic">0%</strong></span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color legend-original"></span>
+                                    <span>Original: <strong id="legend-val-original">100%</strong></span>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="checklist">
@@ -184,6 +195,26 @@
                                 <label>Segmented Sentence</label>
                                 <blockquote id="inspect-text">""</blockquote>
                             </div>
+                            
+                            <!-- Plagiarism Match details (shown only if plagiarized) -->
+                            <div class="plagiarism-match-details hidden" id="plagiarism-match-details">
+                                <div class="inspector-text-block">
+                                    <label>Integrity Check Match Info</label>
+                                    <div class="match-info-row">
+                                        <span class="badge" id="inspect-match-type">Lexical</span>
+                                        <span class="badge" id="inspect-match-score">98% Match</span>
+                                    </div>
+                                </div>
+                                <div class="inspector-text-block">
+                                    <label>Matched Source Reference</label>
+                                    <blockquote id="inspect-match-ref-text">""</blockquote>
+                                    <div class="source-metadata-box">
+                                        <span class="source-title" id="inspect-match-title">-</span>
+                                        <span class="source-citation" id="inspect-match-citation">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <!-- Paraphrase Action Button -->
                             <button class="btn btn-full btn-outline" id="btn-quick-paraphrase">
                                 <i class="fa-solid fa-pen-nib"></i> Paraphrase Segment

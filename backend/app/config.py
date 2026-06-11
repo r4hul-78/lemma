@@ -17,9 +17,15 @@ class Settings(BaseSettings):
     
     # NLP / AI Settings
     SPACY_MODEL: str = "en_core_web_sm"
+    SENTENCE_TRANSFORMERS_MODEL: str = "all-MiniLM-L6-v2"
+    MOCK_DATABASE_PATH: Path = BASE_DIR / "data" / "mock_references.json"
+    LEXICAL_THRESHOLD: float = 0.70
+    SEMANTIC_THRESHOLD: float = 0.65
     
     # Database Settings
     SQLITE_DB_FILE: str = "lemma.db"
+    SQLITE_DB_PATH: Path = BASE_DIR / "data" / "lemma.db"
+    FAISS_INDEX_PATH: Path = BASE_DIR / "data" / "lemma_vectors.index"
     
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -36,5 +42,6 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Ensure uploads directory exists
+# Ensure uploads and data directories exist
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+settings.FAISS_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)

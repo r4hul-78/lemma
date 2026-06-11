@@ -1,0 +1,30 @@
+[
+  {
+    "id": "ref_deep_learning",
+    "title": "Deep Learning: Principles and Foundations",
+    "author": "Dr. Sarah Jenkins",
+    "source": "Journal of Artificial Intelligence Research, 2024",
+    "text": "Deep learning is a subset of machine learning that is based on artificial neural networks with representation learning. The adjective deep in deep learning refers to the use of multiple layers in the network. Historically, neural networks were limited in depth due to computational constraints and training difficulties. Today, modern deep learning architectures utilize convolutional neural networks and transformer architectures to process vast datasets. These models have revolutionized fields like computer vision, natural language processing, and robotics."
+  },
+  {
+    "id": "ref_climate_change",
+    "title": "The Decisive Decade: Climate Action and Clean Energy",
+    "author": "Marcus Thorne",
+    "source": "Environmental Science Review, 2025",
+    "text": "Climate change represents one of the defining challenges of our generation, requiring immediate and decisive systemic shifts. Global greenhouse gas emissions must be reduced by half before the end of this decade to prevent catastrophic warming. Transitioning from fossil fuels to renewable energy sources like wind and solar power is crucial. Furthermore, carbon capture technologies and reforestation projects will play a supporting role. Policymakers must coordinate international efforts to subsidize clean energy grids and tax carbon-heavy industrial production."
+  },
+  {
+    "id": "ref_history_internet",
+    "title": "Decentralized Paths: A History of the World Wide Web",
+    "author": "Prof. Alan Vance",
+    "source": "Computing History Quarterly, 2023",
+    "text": "The World Wide Web was invented by Sir Tim Berners-Lee in 1989 while working at CERN as a distributed information sharing system. Initially, it was designed to meet the demand for automated information-sharing between scientists in universities and institutes around the world. The first web browser, WorldWideWeb, was written on a NeXT Computer. Within a decade, the web transformed from a static academic repository into a dynamic global platform for commerce, communication, and social interaction. This transformation laid the foundation for modern cloud computing and mobile application ecosystems."
+  },
+  {
+    "id": "ref_dna_genetics",
+    "title": "Genomic Horizons: Editing the Code of Life",
+    "author": "Dr. Elena Rostova",
+    "source": "Biotech Today, 2024",
+    "text": "Gene editing technologies have advanced rapidly, driven by the discovery and development of the CRISPR-Cas9 system. This molecular tool allows researchers to make precise changes to DNA sequences in a wide variety of organisms. By targeting specific genes, scientists can potentially correct genetic mutations responsible for inherited disorders. However, the prospect of germline gene editing raises profound ethical questions regarding consent and human enhancement. The international scientific community continues to debate the boundaries of responsible genomic intervention."
+  }
+]

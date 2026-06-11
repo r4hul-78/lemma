@@ -13,3 +13,4 @@ sentence-transformers>=2.5.0
 celery>=5.3.6
 redis>=5.0.2
 weasyprint>=61.2
+faiss-cpu>=1.8.0

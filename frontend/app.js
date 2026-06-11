@@ -235,7 +235,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Toggle active selection state
                 document.querySelectorAll(".doc-sentence").forEach(s => s.classList.remove("active"));
                 sentSpan.classList.add("active");
-                inspectSentence(sentence, true);
+                const matchData = sentSpan.dataset.match ? JSON.parse(sentSpan.dataset.match) : null;
+                inspectSentence(sentence, matchData, true);
             });
 
             documentRender.appendChild(sentSpan);
@@ -261,17 +262,153 @@ document.addEventListener("DOMContentLoaded", () => {
         // If there's no clicked sentence active, update on hover
         const hasActiveClick = document.querySelector(".doc-sentence.active") !== null;
         if (!hasActiveClick) {
-            inspectSentence(sentence, false);
+            const matchData = element.dataset.match ? JSON.parse(element.dataset.match) : null;
+            inspectSentence(sentence, matchData, false);
         }
     }
 
-    function inspectSentence(sentence, isClicked) {
+    function inspectSentence(sentence, matchData, isClicked) {
         inspectorPlaceholder.classList.add("hidden");
         inspectorData.classList.remove("hidden");
 
         inspectStart.textContent = sentence.start_char;
         inspectEnd.textContent = sentence.end_char;
         inspectText.textContent = `"${sentence.text}"`;
+
+        const matchDetailsDiv = document.getElementById("plagiarism-match-details");
+        const inspectMatchRefText = document.getElementById("inspect-match-ref-text");
+        const matchSourceBlock = inspectMatchRefText ? inspectMatchRefText.closest(".inspector-text-block") : null;
+
+        if (matchData) {
+            matchDetailsDiv.classList.remove("hidden");
+            if (matchSourceBlock) {
+                matchSourceBlock.classList.remove("hidden");
+            }
+            
+            const matchTypeBadge = document.getElementById("inspect-match-type");
+            const matchScoreBadge = document.getElementById("inspect-match-score");
+            const matchTitle = document.getElementById("inspect-match-title");
+            const matchCitation = document.getElementById("inspect-match-citation");
+            
+            // Set Match Type Badge
+            if (matchData.match_type === "lexical") {
+                matchTypeBadge.className = "badge badge-red";
+                matchTypeBadge.textContent = "Lexical Match";
+            } else {
+                matchTypeBadge.className = "badge badge-purple";
+                matchTypeBadge.textContent = "Semantic Match";
+            }
+            
+            // Set Match Score
+            const pct = Math.round(matchData.score * 100);
+            matchScoreBadge.textContent = `${pct}% Similarity`;
+            matchScoreBadge.className = "badge " + (matchData.match_type === "lexical" ? "badge-red" : "badge-purple");
+            
+            // Set reference sentence and doc info
+            inspectMatchRefText.textContent = `"${matchData.matched_sentence.text}"`;
+            matchTitle.textContent = matchData.matched_sentence.doc_title;
+            matchCitation.textContent = `${matchData.matched_sentence.doc_author} — ${matchData.matched_sentence.doc_source}`;
+        } else {
+            // Check if this sentence was marked as original
+            const sentenceSpans = document.querySelectorAll(".doc-sentence");
+            let isOriginal = false;
+            sentenceSpans.forEach(span => {
+                if (parseInt(span.dataset.start) === sentence.start_char && span.classList.contains("original")) {
+                    isOriginal = true;
+                }
+            });
+
+            if (isOriginal) {
+                matchDetailsDiv.classList.remove("hidden");
+                
+                const matchTypeBadge = document.getElementById("inspect-match-type");
+                const matchScoreBadge = document.getElementById("inspect-match-score");
+                
+                matchTypeBadge.className = "badge badge-green";
+                matchTypeBadge.textContent = "Original Segment";
+                
+                matchScoreBadge.className = "badge badge-green";
+                matchScoreBadge.textContent = "0% Similarity";
+                
+                if (matchSourceBlock) {
+                    matchSourceBlock.classList.add("hidden");
+                }
+            } else {
+                matchDetailsDiv.classList.add("hidden");
+            }
+        }
+    }
+
+    function applyPlagiarismHighlights(analysis) {
+        if (!analysis || !analysis.matches) return;
+
+        // Map query sentence start_char to its match object for quick lookup
+        const matchesMap = {};
+        analysis.matches.forEach(m => {
+            matchesMap[m.query_sentence.start_char] = m;
+        });
+
+        // Select all sentence spans in the viewer
+        const sentenceSpans = document.querySelectorAll(".doc-sentence");
+        sentenceSpans.forEach(span => {
+            const start = parseInt(span.dataset.start);
+            const match = matchesMap[start];
+
+            // Reset any old analysis classes first
+            span.className = "doc-sentence";
+
+            if (match) {
+                const text = span.textContent;
+                
+                span.classList.add("plagiarized");
+                span.classList.add(match.match_type === "lexical" ? "match-lexical" : "match-semantic");
+                span.dataset.match = JSON.stringify(match);
+
+                // Re-render sentence text with word-level mark tags
+                const highlights = match.highlights;
+                if (highlights && highlights.length > 0) {
+                    const sortedHls = highlights.map(hl => ({
+                        start: hl.start_char - start,
+                        end: hl.end_char - start,
+                        text: hl.text
+                    })).sort((a, b) => a.start - b.start);
+
+                    let htmlContent = "";
+                    let lastIdx = 0;
+
+                    sortedHls.forEach(hl => {
+                        if (hl.start > lastIdx) {
+                            htmlContent += escapeHtml(text.substring(lastIdx, hl.start));
+                        }
+                        const markClass = match.match_type === "lexical" ? "mark-lexical" : "mark-semantic";
+                        htmlContent += `<mark class="${markClass}">${escapeHtml(text.substring(hl.start, hl.end))}</mark>`;
+                        lastIdx = hl.end;
+                    });
+
+                    if (lastIdx < text.length) {
+                        htmlContent += escapeHtml(text.substring(lastIdx));
+                    }
+
+                    span.innerHTML = htmlContent;
+                } else {
+                    const markClass = match.match_type === "lexical" ? "mark-lexical" : "mark-semantic";
+                    span.innerHTML = `<mark class="${markClass}">${escapeHtml(text)}</mark>`;
+                }
+            } else {
+                // If it is not a match, it is clean/original! Apply original styles
+                span.classList.add("original");
+                span.removeAttribute("data-match");
+            }
+        });
+    }
+
+    function escapeHtml(str) {
+        return str
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 
     // Reset Viewer/Upload Ingestion state
@@ -289,18 +426,45 @@ document.addEventListener("DOMContentLoaded", () => {
         // Reset Inspector state
         inspectorPlaceholder.classList.remove("hidden");
         inspectorData.classList.add("hidden");
-        document.querySelectorAll(".doc-sentence").forEach(s => s.classList.remove("active"));
+        document.querySelectorAll(".doc-sentence").forEach(s => {
+            s.className = "doc-sentence";
+            s.removeAttribute("data-match");
+            s.innerHTML = escapeHtml(s.textContent);
+        });
+
+        // Reset Plagiarism progress metrics & legend values
+        const progressScore = document.getElementById("plagiarism-score-text");
+        const progressCircle = document.querySelector(".circular-progress");
+        const lexicalChk = document.getElementById("chk-lexical");
+        const semanticChk = document.getElementById("chk-semantic");
+
+        progressScore.textContent = "0%";
+        progressCircle.style.background = "conic-gradient(var(--border-color) 360deg, transparent 0deg)";
+        
+        lexicalChk.innerHTML = '<i class="fa-regular fa-circle"></i> Lexical Matching (TF-IDF)';
+        lexicalChk.className = "checklist-item";
+        semanticChk.innerHTML = '<i class="fa-regular fa-circle"></i> Semantic Indexing (Embeddings)';
+        semanticChk.className = "checklist-item";
+
+        document.getElementById("legend-val-lexical").textContent = "0%";
+        document.getElementById("legend-val-semantic").textContent = "0%";
+        document.getElementById("legend-val-original").textContent = "100%";
 
         activeFile = null;
         uploadResponseData = null;
         btnRunAnalysis.disabled = true;
     });
 
-    // Trigger analysis toast (Phase 2 Preview callback)
+    // Trigger analysis toast (Phase 2 Integration)
     btnRunAnalysis.addEventListener("click", () => {
+        if (!uploadResponseData || !uploadResponseData.analysis) {
+            showToast("No analysis report found for this document.", "error");
+            return;
+        }
+
+        const analysis = uploadResponseData.analysis;
         showToast("Phase 2 Matcher Engine running (Lexical & Semantic)...", "info");
         
-        // Mock a matching analysis update for WOW styling
         const lexicalChk = document.getElementById("chk-lexical");
         const semanticChk = document.getElementById("chk-semantic");
         const progressScore = document.getElementById("plagiarism-score-text");
@@ -314,15 +478,47 @@ document.addEventListener("DOMContentLoaded", () => {
             semanticChk.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Indexing Semantic Vectors...';
             semanticChk.className = "checklist-item done";
             
-            // Set mock circular progress values
-            progressScore.textContent = "37%";
-            progressCircle.style.background = `conic-gradient(var(--accent-purple) ${37 * 3.6}deg, var(--border-color) 0deg)`;
-            
+            // Calculate real percentages
+            const total = analysis.total_sentences;
+            const lexicalCount = analysis.lexical_matches_count;
+            const semanticCount = analysis.semantic_matches_count;
+
+            const pctL = total > 0 ? Math.round((lexicalCount / total) * 100) : 0;
+            const pctS = total > 0 ? Math.round((semanticCount / total) * 100) : 0;
+            const pctO = Math.max(0, 100 - pctL - pctS);
+
             setTimeout(() => {
                 semanticChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Semantic Matching Complete';
-                showToast("Analysis complete. Found 37% plagiarism match profile.", "success");
-            }, 1500);
-        }, 1500);
+                
+                // Set circular progress middle text (overall plagiarism score)
+                const realPlagScore = pctL + pctS;
+                progressScore.textContent = `${realPlagScore}%`;
+                
+                // Calculate conic gradient slices:
+                // Red (Lexical): 0 to pctL%
+                // Purple (Semantic): pctL% to (pctL + pctS)%
+                // Green (Original): (pctL + pctS)% to 100%
+                const degL = pctL * 3.6;
+                const degS = pctS * 3.6;
+                
+                progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #8b5cf6 ${degL}deg ${degL + degS}deg, #10b981 ${degL + degS}deg 360deg)`;
+                
+                // Update Legend Values
+                document.getElementById("legend-val-lexical").textContent = `${pctL}%`;
+                document.getElementById("legend-val-semantic").textContent = `${pctS}%`;
+                document.getElementById("legend-val-original").textContent = `${pctO}%`;
+
+                // Apply visual highlights to document sentences
+                applyPlagiarismHighlights(analysis);
+                
+                // Final success toast
+                if (realPlagScore > 0) {
+                    showToast(`Analysis complete. Found ${realPlagScore}% plagiarism match profile.`, "success");
+                } else {
+                    showToast("Analysis complete. Document is 100% original and clean!", "success");
+                }
+            }, 1200);
+        }, 1200);
     });
 
     // Paraphrase button triggers UI alert
@@ -349,21 +545,5 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     });
-
-    // Mock theme toggle (pure black stays, toggle adds styling glow shift)
-    let isPurpleAccent = true;
-    const themeToggleBtn = document.getElementById("theme-toggle-btn");
-    themeToggleBtn.addEventListener("click", () => {
-        isPurpleAccent = !isPurpleAccent;
-        const bodyRoot = document.documentElement;
-        if (isPurpleAccent) {
-            bodyRoot.style.setProperty("--accent-purple", "#8b5cf6");
-            themeToggleBtn.innerHTML = '<i class="fa-solid fa-moon"></i>';
-            showToast("Accent shifted to Royal Purple glow.", "info");
-        } else {
-            bodyRoot.style.setProperty("--accent-purple", "#10b981"); // Emerald green accent alternative
-            themeToggleBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
-            showToast("Accent shifted to Emerald Green glow.", "info");
-        }
-    });
 });
+
