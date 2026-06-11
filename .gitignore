@@ -4,7 +4,7 @@ venv/
 env/
 ENV/
 
-# Python Cache
+# Python Cache & Compiled Files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -13,6 +13,7 @@ __pycache__/
 .coverage
 htmlcov/
 .mypy_cache/
+.ipynb_checkpoints/
 
 # Databases
 *.db
@@ -33,12 +34,18 @@ backend/app/uploads/
 # OS Specific
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Environment variables
+# Environment variables & Local configuration
 .env
+.env.*
+!.env.example
 
-# Node / React (for future phases)
+# Node / React (for future phases / build residue)
 node_modules/
 dist/
 build/
 .eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

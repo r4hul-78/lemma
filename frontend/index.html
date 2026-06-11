@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma - Local-First Plagiarism Analysis & Rewriting Platform</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-fontawesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="landing-body">
+    <!-- Background Atmospheric Fog Overlays -->
+    <div class="fog-overlay fog-1"></div>
+    <div class="fog-overlay fog-2"></div>
+
+    <!-- Interactive Canvas Particle Sphere Container -->
+    <div class="canvas-container">
+        <canvas id="particle-canvas"></canvas>
+    </div>
+
+    <!-- Landing Header Navigation -->
+    <header class="landing-header">
+        <div class="header-logo">
+            <i class="fa-solid fa-graduation-cap brand-icon"></i>
+            <span class="logo-text">Lemma</span>
+        </div>
+        <nav class="header-nav">
+            <a href="#features">Features</a>
+            <a href="#technology">Technology</a>
+            <a href="https://github.com" target="_blank">Developers</a>
+        </nav>
+        <div class="header-cta">
+            <a href="dashboard.html" class="btn btn-secondary nav-cta-btn">
+                Launch Workspace <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+    </header>
+
+    <!-- Hero Showcase -->
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">
+                Everything you need to <br>
+                <span class="typewriter-text" id="typewriter">analyze</span><span class="cursor">|</span> <br>
+                academic documents.
+            </h1>
+            
+            <p class="hero-subtitle">
+                A high-performance, local-first academic plagiarism engine. Map lexical and semantic matches directly to character coordinates and compile publication-ready reports.
+            </p>
+
+            <div class="hero-actions">
+                <a href="dashboard.html" class="btn btn-primary hero-btn-main">
+                    Launch Workspace <i class="fa-solid fa-arrow-right btn-arrow"></i>
+                </a>
+                <a href="#features" class="btn btn-outline hero-btn-sub">
+                    Explore Features
+                </a>
+            </div>
+
+            <!-- Stats Rows (Wow Factor) -->
+            <div class="stats-row">
+                <div class="stat-item">
+                    <span class="stat-number"><i class="fa-solid fa-square-check stat-icon"></i> 99.8%</span>
+                    <span class="stat-description">Sentence Match Precision</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number"><i class="fa-solid fa-database stat-icon"></i> Local</span>
+                    <span class="stat-description">Vector Index DB</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number"><i class="fa-solid fa-bolt stat-icon"></i> Instant</span>
+                    <span class="stat-description">PDF Report Compiles</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Partners Row (Academic / ML Stack) -->
+    <section class="partners-section">
+        <div class="partners-header">POWERED BY INTEGRATED LOCAL STACK</div>
+        <div class="partners-logos">
+            <div class="partner-logo"><i class="fa-solid fa-rocket"></i> FastAPI</div>
+            <div class="partner-logo"><i class="fa-solid fa-brain"></i> spaCy</div>
+            <div class="partner-logo"><i class="fa-solid fa-circle-nodes"></i> SentenceTransformers</div>
+            <div class="partner-logo"><i class="fa-solid fa-cube"></i> Ollama</div>
+            <div class="partner-logo"><i class="fa-solid fa-file-pdf"></i> WeasyPrint</div>
+        </div>
+    </section>
+
+    <!-- Features Section below fold -->
+    <section class="features-section" id="features">
+        <div class="section-tag">Lemma Architecture</div>
+        <h2 class="section-title">Designed for Academic Integrity</h2>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <i class="fa-solid fa-shield-halved feature-icon"></i>
+                <h3>Dual-Tier Detection</h3>
+                <p>Combines classical TF-IDF keyword overlap with Sentence-Transformers bi-encoder embeddings to catch both verbatim copying and semantic paraphrasing.</p>
+            </div>
+            <div class="feature-card">
+                <i class="fa-solid fa-circle-dot feature-icon"></i>
+                <h3>Coordinate Highlights</h3>
+                <p>SpaCy segmentation matches sentence tokens back to absolute character indices, allowing the frontend to overlay highlighting markers on the original layout.</p>
+            </div>
+            <div class="feature-card">
+                <i class="fa-solid fa-terminal feature-icon"></i>
+                <h3>Local-First Computing</h3>
+                <p>Processes occur on your machine. No cloud uploads. Keep confidential drafts, unpublished findings, and proprietary theses safe.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="landing-footer">
+        <div class="footer-left">
+            <p>&copy; 2026 Lemma Plagiarism Engine. Local Academic Ingestion.</p>
+        </div>
+        <div class="footer-right">
+            <a href="#features">Privacy Policy</a>
+            <a href="#features">Terms of Service</a>
+        </div>
+    </footer>
+
+    <!-- Landing page specific animations and particle sphere -->
+    <script src="landing.js"></script>
+</body>
+</html>

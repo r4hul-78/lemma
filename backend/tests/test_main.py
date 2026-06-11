@@ -4,7 +4,8 @@ from backend.app.config import settings
 def test_root_endpoint(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json()["status"] == "online"
+    assert "text/html" in response.headers.get("content-type", "")
+    assert b"<!DOCTYPE html>" in response.content
 
 def test_health_endpoint(client):
     response = client.get("/health")

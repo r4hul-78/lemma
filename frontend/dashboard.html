@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma - Plagiarism Analysis & Paraphrasing Platform</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-fontawesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background Atmospheric Fog Overlays -->
+    <div class="fog-overlay fog-1"></div>
+    <div class="fog-overlay fog-2"></div>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <i class="fa-solid fa-graduation-cap brand-icon"></i>
+                <div class="brand-text">
+                    <h1>Lemma</h1>
+                    <span>Plagiarism Engine</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-item active" id="nav-dashboard">
+                        <a href="#"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item" id="nav-plagiarism">
+                        <a href="#"><i class="fa-solid fa-shield-halved"></i> Plagiarism Checker</a>
+                    </li>
+                    <li class="nav-item" id="nav-paraphraser">
+                        <a href="#"><i class="fa-solid fa-pen-nib"></i> Paraphraser</a>
+                    </li>
+                    <li class="nav-item" id="nav-reports">
+                        <a href="#"><i class="fa-solid fa-file-pdf"></i> Reports</a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="server-status">
+                    <span class="status-indicator offline" id="server-status-dot"></span>
+                    <span id="server-status-text">Checking server...</span>
+                </div>
+                <div class="version">v1.0.0-beta</div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-welcome">
+                    <h2>Hello, Researcher <span class="wave-emoji">👋</span></h2>
+                    <p>Analyze your academic documents for lexical and semantic integrity.</p>
+                </div>
+                <div class="header-profile">
+                    <div class="profile-avatar">R</div>
+                </div>
+            </header>
+
+            <!-- Dashboard Content Grid -->
+            <div class="content-grid">
+                
+                <!-- Left Panel: Ingestion or Viewer -->
+                <section class="left-panel panel">
+                    <!-- Drop Zone (Shown by default) -->
+                    <div class="drop-zone" id="drop-zone">
+                        <div class="drop-zone-content">
+                            <div class="icon-circle">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                            </div>
+                            <h3>Ingest Document</h3>
+                            <p class="drop-instructions">Drag and drop your file here, or click to browse</p>
+                            <span class="file-formats">Supported formats: PDF, DOCX, TXT (Max 100MB)</span>
+                            <input type="file" id="file-input" accept=".pdf,.docx,.txt" style="display: none;">
+                        </div>
+                    </div>
+
+                    <!-- Document Viewer (Hidden by default) -->
+                    <div class="document-viewer hidden" id="document-viewer">
+                        <div class="viewer-header">
+                            <div class="viewer-title-area">
+                                <h3 id="viewer-filename">document.txt</h3>
+                                <span class="badge" id="viewer-doc-type">TXT</span>
+                            </div>
+                            <div class="viewer-actions">
+                                <button class="btn btn-secondary" id="btn-reupload">
+                                    <i class="fa-solid fa-arrow-up-from-bracket"></i> Ingest New
+                                </button>
+                                <button class="btn btn-primary" id="btn-run-analysis" disabled>
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Run Analysis
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="viewer-scroller">
+                            <!-- Sentences with coordinate highlighting will be rendered here -->
+                            <div class="document-content-render" id="document-content-render"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Right Panel: Metadata & Stats -->
+                <aside class="right-panel">
+                    <!-- Document Metadata Summary -->
+                    <div class="panel metadata-card">
+                        <h3>Document Overview</h3>
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <span class="stat-label">Characters</span>
+                                <span class="stat-value" id="meta-chars">-</span>
+                            </div>
+                            <div class="stat-box">
+                                <span class="stat-label">Sentences</span>
+                                <span class="stat-value" id="meta-sentences">-</span>
+                            </div>
+                        </div>
+                        
+                        <div class="info-list">
+                            <div class="info-item">
+                                <span class="info-label">File Name</span>
+                                <span class="info-val" id="meta-filename">No file uploaded</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Parser Status</span>
+                                <span class="info-val" id="meta-status"><span class="badge badge-dim">Idle</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Plagiarism Matcher Metrics (Phase 2 Preview) -->
+                    <div class="panel progress-card">
+                        <div class="card-header-row">
+                            <h3>Integrity Profile</h3>
+                            <span class="badge badge-purple">Phase 2 Preview</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="circular-progress">
+                                <div class="value-container" id="plagiarism-score-text">0%</div>
+                            </div>
+                            <span class="progress-desc">Lexical & Semantic Match Score</span>
+                            <div class="progress-legend" id="progress-legend">
+                                <div class="legend-item">
+                                    <span class="legend-color legend-lexical"></span>
+                                    <span>Lexical: <strong id="legend-val-lexical">0%</strong></span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color legend-semantic"></span>
+                                    <span>Semantic: <strong id="legend-val-semantic">0%</strong></span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color legend-original"></span>
+                                    <span>Original: <strong id="legend-val-original">100%</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="checklist">
+                            <div class="checklist-item done">
+                                <i class="fa-regular fa-circle-check"></i> Document Ingested
+                            </div>
+                            <div class="checklist-item done">
+                                <i class="fa-regular fa-circle-check"></i> Coordinate Mapping
+                            </div>
+                            <div class="checklist-item" id="chk-lexical">
+                                <i class="fa-regular fa-circle"></i> Lexical Matching (TF-IDF)
+                            </div>
+                            <div class="checklist-item" id="chk-semantic">
+                                <i class="fa-regular fa-circle"></i> Semantic Indexing (Embeddings)
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sentence Detail Inspector -->
+                    <div class="panel inspector-card" id="inspector-card">
+                        <h3>Sentence Coordinate Inspector</h3>
+                        <p class="inspector-placeholder" id="inspector-placeholder">
+                            Hover or click on a segmented sentence in the document viewer to inspect absolute character coordinate indices.
+                        </p>
+                        <div class="inspector-data hidden" id="inspector-data">
+                            <div class="coordinate-tag-row">
+                                <span class="coord-tag"><i class="fa-solid fa-arrow-right-to-bracket"></i> Start: <strong id="inspect-start">0</strong></span>
+                                <span class="coord-tag"><i class="fa-solid fa-arrow-right-from-bracket"></i> End: <strong id="inspect-end">0</strong></span>
+                            </div>
+                            <div class="inspector-text-block">
+                                <label>Segmented Sentence</label>
+                                <blockquote id="inspect-text">""</blockquote>
+                            </div>
+                            
+                            <!-- Plagiarism Match details (shown only if plagiarized) -->
+                            <div class="plagiarism-match-details hidden" id="plagiarism-match-details">
+                                <div class="inspector-text-block">
+                                    <label>Integrity Check Match Info</label>
+                                    <div class="match-info-row">
+                                        <span class="badge" id="inspect-match-type">Lexical</span>
+                                        <span class="badge" id="inspect-match-score">98% Match</span>
+                                    </div>
+                                </div>
+                                <div class="inspector-text-block">
+                                    <label>Matched Source Reference</label>
+                                    <blockquote id="inspect-match-ref-text">""</blockquote>
+                                    <div class="source-metadata-box">
+                                        <span class="source-title" id="inspect-match-title">-</span>
+                                        <span class="source-citation" id="inspect-match-citation">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Paraphrase Action Button -->
+                            <button class="btn btn-full btn-outline" id="btn-quick-paraphrase">
+                                <i class="fa-solid fa-pen-nib"></i> Paraphrase Segment
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </main>
+    </div>
+
+    <!-- Error/Notification Toast -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

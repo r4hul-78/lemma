@@ -11,6 +11,7 @@ from backend.app.services.extractor import (
     ExtractionError,
 )
 from backend.app.services.segmenter import SentenceSegmenterService
+from backend.app.services.matcher import DualTierMatcher
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -33,7 +34,7 @@ app.add_middleware(
 @app.exception_handler(FileSizeExceededError)
 async def file_size_exceeded_handler(request, exc: FileSizeExceededError):
     return JSONResponse(
-        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
         content={"detail": str(exc)},
     )
 
@@ -59,25 +60,29 @@ async def general_exception_handler(request, exc: Exception):
         content={"detail": f"An unexpected error occurred: {str(exc)}"},
     )
 
-@app.get("/")
-async def root():
-    return {
-        "message": f"Welcome to {settings.PROJECT_NAME}",
-        "docs": "/docs",
-        "status": "online",
-    }
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
 
 @app.get("/health")
 @app.get(f"{settings.API_V1_STR}/health")
 async def health():
     return {"status": "ok", "project": settings.PROJECT_NAME}
 
+# Global/lazy instance of the plagiarism matching engine
+matcher_instance = None
+
+def get_matcher():
+    global matcher_instance
+    if matcher_instance is None:
+        matcher_instance = DualTierMatcher()
+    return matcher_instance
+
 @app.post(
     f"{settings.API_V1_STR}/documents/upload",
     response_model=DocumentUploadResponse,
     status_code=status.HTTP_200_OK,
     summary="Upload and segment a document",
-    description="Ingests a PDF, DOCX, or TXT file, validates constraints, extracts plain text, and segments it into sentences with absolute character indices."
+    description="Ingests a PDF, DOCX, or TXT file, validates constraints, extracts plain text, segments it, and runs lexical & semantic plagiarism analysis."
 )
 async def upload_document(file: UploadFile = File(...)):
     if not file.filename:
@@ -105,10 +110,22 @@ async def upload_document(file: UploadFile = File(...)):
         for s in sentences_data
     ]
     
+    # Perform Phase 2 Plagiarism Analysis
+    matcher = get_matcher()
+    analysis_report = matcher.analyze_document(sentences_data)
+    
     return DocumentUploadResponse(
         filename=file.filename,
         text=text,
         char_count=len(text),
         sentence_count=len(sentences),
-        sentences=sentences
+        sentences=sentences,
+        analysis=analysis_report
     )
+
+# Serve static frontend files
+FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+# Ensure the directory exists
+FRONTEND_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+
