@@ -11,7 +11,7 @@ Lemma is a high-performance, local-first plagiarism analysis and academic text r
 * **Interactive 3D Visual Shell**: Features a visually stunning, premium dark-mode landing page powered by an interactive **3D Fibonacci Particle Sphere** that rotates, reacts dynamically to mouse cursor dragging/hover, and gracefully bursts and reforms.
 * **Local Generative Rewriter Workspace**: Integrates with local native `Ollama` pipelines (targeting an optimized Qwen 2.5:3B custom model) to offer document-level text rewriting supporting **Academic**, **Standard**, and **Creative** tones.
 * **Decoupled Async Architecture**: Implements `Celery` + `Redis` task queues to run document parsing loops in background workers.
-* **HTML-to-PDF Report Automation**: Generates publication-ready PDF reports with color-coded highlighted plagiarism coordinates using the `WeasyPrint` rendering engine (coming in Phase 5).
+* **HTML-to-PDF Report Automation**: Generates publication-ready PDF reports with color-coded highlighted plagiarism coordinates using the `WeasyPrint` rendering engine.
 
 ---
 
@@ -58,6 +58,7 @@ lemma/
 │   │   │   ├── extractor.py     # Text extraction (PDF, DOCX, TXT)
 │   │   │   ├── llm.py           # Local Ollama client (with tone optimizations)
 │   │   │   ├── matcher.py       # Lexical (TF-IDF) & Semantic (FAISS) matcher
+│   │   │   ├── pdf_generator.py # PDF report compilation using WeasyPrint
 │   │   │   └── segmenter.py     # Optimized spaCy sentence segmenter
 │   │   └── tasks/
 │   │       ├── __init__.py
@@ -70,6 +71,7 @@ lemma/
 │       ├── test_extractor.py    # Document extractor unit tests
 │       ├── test_main.py         # FastAPI endpoint integration tests
 │       ├── test_matcher.py      # Lexical/semantic matcher tests
+│       ├── test_pdf.py          # WeasyPrint and PDF download integration tests
 │       ├── test_rewrite.py      # Mocked Ollama rewrite tests
 │       └── test_segmenter.py    # Sentence segmenter unit tests
 └── frontend/                    # Vanilla JS + Stark-Theme Frontend assets
@@ -190,6 +192,11 @@ Double-click or run the root helper script to install dependencies, setup spaCy,
   }
   ```
 
+### `GET /api/v1/documents/report/{job_id}` (or `/api/report/{job_id}`)
+* **Purpose**: Generates and compiles a downloadable academic integrity PDF report highlighting plagiarism coordinate matches via WeasyPrint.
+* **Response (200 OK)**: A binary file response containing the PDF report (`application/pdf`).
+
+
 ---
 
 ## 🧪 Running the Test Suite
@@ -208,4 +215,4 @@ We use `pytest` for unit and integration testing. Eager mode is forced automatic
 * [x] **Phase 2**: TF-IDF Matrix & Semantic Embeddings Dual Matching Engine (SQLite + FAISS storage)
 * [x] **Phase 3**: Celery Asynchronous Job Queues, Redis Integration, and Ollama Paraphraser Workspace
 * [x] **Phase 4**: Stark dark-theme Frontend with Interactive 3D Canvas and Workspace Switching
-* [ ] **Phase 5**: WeasyPrint PDF Generation & End-to-End E2E Verification
+* [x] **Phase 5**: WeasyPrint PDF Generation & End-to-End E2E Verification

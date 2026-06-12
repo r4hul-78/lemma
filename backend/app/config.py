@@ -1,6 +1,35 @@
 import os
+import sys
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Try to discover and add GTK3/Pango DLL directories on Windows before importing WeasyPrint
+if sys.platform == "win32":
+    # Common GTK3/Pango binary directory paths on Windows
+    gtk_paths = [
+        r"C:\Program Files\GTK3-Runtime Win64\bin",
+        r"C:\Program Files (x86)\GTK3-Runtime Win64\bin",
+        r"C:\msys64\mingw64\bin",
+        r"C:\msys64\ucrt64\bin",
+        # Local workspace paths
+        str(Path(__file__).resolve().parent.parent / "gtk" / "bin")
+    ]
+    
+    # Check GTK3_PATH or PATH env variables
+    env_gtk_path = os.environ.get("GTK3_PATH")
+    if env_gtk_path:
+        gtk_paths.append(os.path.join(env_gtk_path, "bin"))
+        gtk_paths.append(env_gtk_path)
+        
+    for path in gtk_paths:
+        if os.path.isdir(path):
+            if any(os.path.exists(os.path.join(path, name)) for name in ["libgobject-2.0-0.dll", "gobject-2.0-0.dll"]):
+                try:
+                    os.add_dll_directory(path)
+                except AttributeError:
+                    os.environ["PATH"] = path + os.pathsep + os.environ["PATH"]
+                break
+
 
 class Settings(BaseSettings):
     # API Settings

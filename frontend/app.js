@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const viewerDocType = document.getElementById("viewer-doc-type");
     const btnReupload = document.getElementById("btn-reupload");
     const btnRunAnalysis = document.getElementById("btn-run-analysis");
+    const btnDownloadPdf = document.getElementById("btn-download-pdf");
     const toastContainer = document.getElementById("toast-container");
 
     // Metadata Elements
@@ -38,9 +39,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const inspectText = document.getElementById("inspect-text");
     const btnQuickParaphrase = document.getElementById("btn-quick-paraphrase");
 
+    // Reports Workspace Elements
+    const reportsWorkspace = document.getElementById("reports-workspace");
+    const reportsTable = document.getElementById("reports-table");
+    const reportsTableBody = document.getElementById("reports-table-body");
+    const reportsEmptyState = document.getElementById("reports-empty-state");
+    const btnClearHistory = document.getElementById("btn-clear-history");
+
     // App State
     let activeFile = null;
     let uploadResponseData = null;
+    let currentJobId = null;
 
     // Initialize Page
     checkServerHealth();
@@ -164,6 +173,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const jobId = data.job_id;
+            currentJobId = jobId;
+            btnDownloadPdf.classList.add("hidden");
             metaStatus.innerHTML = '<span class="badge badge-dim">Queued...</span>';
             showToast("Analysis job queued on worker.", "info");
             
@@ -504,6 +515,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         activeFile = null;
         uploadResponseData = null;
+        currentJobId = null;
+        btnDownloadPdf.classList.add("hidden");
         btnRunAnalysis.disabled = true;
     });
 
@@ -563,6 +576,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Apply visual highlights to document sentences
                 applyPlagiarismHighlights(analysis);
                 
+                // Show Download PDF button
+                btnDownloadPdf.classList.remove("hidden");
+
+                // Save report to history
+                saveReportToHistory(uploadResponseData.filename, currentJobId, realPlagScore, uploadResponseData);
+
                 // Final success toast
                 if (realPlagScore > 0) {
                     showToast(`Analysis complete. Found ${realPlagScore}% plagiarism match profile.`, "success");
@@ -571,6 +590,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }, 1200);
         }, 1200);
+    });
+
+    // Download PDF Report
+    btnDownloadPdf.addEventListener("click", () => {
+        if (!currentJobId) {
+            showToast("No active report job ID found.", "error");
+            return;
+        }
+        showToast("Downloading PDF report...", "info");
+        window.open(`${API_BASE_URL}/api/v1/documents/report/${currentJobId}`, "_blank");
     });
 
     // Paraphrase button triggers Ollama API call
@@ -635,12 +664,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 dashboardWorkspace.classList.remove("hidden");
                 paraphraserWorkspace.classList.add("hidden");
+                reportsWorkspace.classList.add("hidden");
             } else if (tabId === "nav-paraphraser") {
                 navItems.forEach(n => n.classList.remove("active"));
                 item.classList.add("active");
                 
                 dashboardWorkspace.classList.add("hidden");
                 paraphraserWorkspace.classList.remove("hidden");
+                reportsWorkspace.classList.add("hidden");
+            } else if (tabId === "nav-reports") {
+                navItems.forEach(n => n.classList.remove("active"));
+                item.classList.add("active");
+                
+                dashboardWorkspace.classList.add("hidden");
+                paraphraserWorkspace.classList.add("hidden");
+                reportsWorkspace.classList.remove("hidden");
+                renderReportsHistory();
             } else {
                 showToast(`${item.textContent.trim()} workspace module is coming in Phase 4/5.`, "info");
             }
@@ -733,6 +772,183 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Clipboard Error:", err);
             showToast("Failed to copy text.", "error");
         });
+    });
+
+    /* -------------------------------------------------------------
+     * Reports History & LocalStorage Persistence [NEW]
+     * ------------------------------------------------------------- */
+    function saveReportToHistory(filename, jobId, scorePct, resultData) {
+        try {
+            let history = localStorage.getItem("lemma_reports_history");
+            history = history ? JSON.parse(history) : [];
+            
+            // Check if this jobId already exists in history to prevent duplicates
+            const exists = history.some(item => item.jobId === jobId);
+            if (exists) return;
+            
+            const newReport = {
+                filename: filename,
+                jobId: jobId,
+                date: new Date().toLocaleString(),
+                score: scorePct,
+                result: resultData
+            };
+            
+            history.unshift(newReport); // Add to the beginning
+            
+            // Limit history to 20 entries
+            if (history.length > 20) {
+                history.pop();
+            }
+            
+            localStorage.setItem("lemma_reports_history", JSON.stringify(history));
+        } catch (e) {
+            console.error("Error saving report to history:", e);
+        }
+    }
+
+    function renderReportsHistory() {
+        try {
+            let history = localStorage.getItem("lemma_reports_history");
+            history = history ? JSON.parse(history) : [];
+            
+            reportsTableBody.innerHTML = "";
+            
+            if (history.length === 0) {
+                reportsTable.classList.add("hidden");
+                reportsEmptyState.classList.remove("hidden");
+                btnClearHistory.disabled = true;
+                return;
+            }
+            
+            reportsTable.classList.remove("hidden");
+            reportsEmptyState.classList.add("hidden");
+            btnClearHistory.disabled = false;
+            
+            history.forEach((item, index) => {
+                const tr = document.createElement("tr");
+                
+                // Get similarity badge class
+                let scoreBadgeClass = "badge-green";
+                if (item.score > 50) {
+                    scoreBadgeClass = "badge-red";
+                } else if (item.score > 20) {
+                    scoreBadgeClass = "badge-purple";
+                }
+                
+                tr.innerHTML = `
+                    <td>
+                        <i class="fa-solid fa-file-invoice" style="margin-right: 8px; color: var(--text-muted);"></i>
+                        <strong>${escapeHtml(item.filename)}</strong>
+                    </td>
+                    <td>${escapeHtml(item.date)}</td>
+                    <td>
+                        <span class="badge ${scoreBadgeClass}">
+                            ${item.score}% Similarity
+                        </span>
+                    </td>
+                    <td><span class="badge badge-dim">Completed</span></td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-sm btn-outline btn-restore-report" data-index="${index}" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; margin-right: 0.25rem;">
+                            <i class="fa-solid fa-eye"></i> View
+                        </button>
+                        <button class="btn btn-sm btn-secondary btn-download-report-pdf" data-jobid="${item.jobId}" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
+                            <i class="fa-solid fa-file-pdf"></i> PDF
+                        </button>
+                    </td>
+                `;
+                reportsTableBody.appendChild(tr);
+            });
+            
+            // Bind view/restore clicks
+            document.querySelectorAll(".btn-restore-report").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const idx = parseInt(btn.dataset.index);
+                    const item = history[idx];
+                    if (item && item.result) {
+                        restoreReportToViewer(item);
+                    }
+                });
+            });
+            
+            // Bind download pdf clicks
+            document.querySelectorAll(".btn-download-report-pdf").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const jobId = btn.dataset.jobid;
+                    showToast("Downloading PDF report...", "info");
+                    window.open(`${API_BASE_URL}/api/v1/documents/report/${jobId}`, "_blank");
+                });
+            });
+        } catch (e) {
+            console.error("Error rendering reports history:", e);
+        }
+    }
+
+    function restoreReportToViewer(reportItem) {
+        // Switch variables
+        uploadResponseData = reportItem.result;
+        currentJobId = reportItem.jobId;
+        activeFile = { name: reportItem.filename }; // mock active file
+        
+        // Render document text structures
+        renderDocument(uploadResponseData);
+        
+        // Enable PDF download button
+        btnDownloadPdf.classList.remove("hidden");
+        
+        // Immediately run analysis rendering in UI (without delay since it's already computed)
+        const analysis = uploadResponseData.analysis;
+        const lexicalChk = document.getElementById("chk-lexical");
+        const semanticChk = document.getElementById("chk-semantic");
+        const progressScore = document.getElementById("plagiarism-score-text");
+        const progressCircle = document.querySelector(".circular-progress");
+
+        lexicalChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Lexical Match Complete';
+        lexicalChk.className = "checklist-item done";
+        semanticChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Semantic Matching Complete';
+        semanticChk.className = "checklist-item done";
+        
+        const total = analysis.total_sentences;
+        const lexicalCount = analysis.lexical_matches_count;
+        const semanticCount = analysis.semantic_matches_count;
+
+        const pctL = total > 0 ? Math.round((lexicalCount / total) * 100) : 0;
+        const pctS = total > 0 ? Math.round((semanticCount / total) * 100) : 0;
+        const pctO = Math.max(0, 100 - pctL - pctS);
+        
+        const realPlagScore = pctL + pctS;
+        progressScore.textContent = `${realPlagScore}%`;
+        
+        const degL = pctL * 3.6;
+        const degS = pctS * 3.6;
+        progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #8b5cf6 ${degL}deg ${degL + degS}deg, #10b981 ${degL + degS}deg 360deg)`;
+        
+        document.getElementById("legend-val-lexical").textContent = `${pctL}%`;
+        document.getElementById("legend-val-semantic").textContent = `${pctS}%`;
+        document.getElementById("legend-val-original").textContent = `${pctO}%`;
+
+        applyPlagiarismHighlights(analysis);
+        btnRunAnalysis.disabled = false;
+        
+        // Switch view to dashboard
+        navItems.forEach(n => n.classList.remove("active"));
+        document.getElementById("nav-dashboard").classList.add("active");
+        document.getElementById("nav-plagiarism").classList.add("active");
+        
+        dashboardWorkspace.classList.remove("hidden");
+        paraphraserWorkspace.classList.add("hidden");
+        reportsWorkspace.classList.add("hidden");
+        
+        showToast(`Loaded analysis report for ${reportItem.filename}`, "success");
+    }
+
+    // Clear History Action
+    btnClearHistory.addEventListener("click", () => {
+        if (confirm("Are you sure you want to clear your reports history? This cannot be undone.")) {
+            localStorage.removeItem("lemma_reports_history");
+            renderReportsHistory();
+            showToast("Reports history cleared.", "info");
+        }
     });
 });
 

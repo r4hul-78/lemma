@@ -4,9 +4,10 @@ from celery.result import AsyncResult
 # pyrefly: ignore [missing-import]
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from backend.app.config import settings
+from backend.app.services.pdf_generator import PDFGeneratorService
 from backend.app.schemas.document import DocumentUploadResponse, SentenceCoordinate
 from backend.app.schemas.rewrite import RewriteRequest, RewriteResponse
 from backend.app.services.extractor import (
@@ -236,6 +237,58 @@ async def get_job_status(job_id: str):
             "job_id": job_id,
             "status": "processing"
         }
+
+
+@app.get(
+    f"{settings.API_V1_STR}/documents/report/{{job_id}}",
+    summary="Download PDF report for a job",
+    description="Generates and returns the official downloadable PDF plagiarism analysis report for a completed job."
+)
+@app.get(
+    "/api/report/{job_id}",
+    include_in_schema=False
+)
+async def get_job_report_pdf(job_id: str):
+    res = AsyncResult(job_id, app=celery_app)
+    
+    if res.state != "SUCCESS":
+        if res.state in ("PENDING", "RECEIVED", "STARTED", "RETRY"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Plagiarism analysis is still in progress. Please wait for completion before downloading the report."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Plagiarism report not found or task failed."
+            )
+            
+    result = res.result
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Plagiarism report details are empty or unavailable."
+        )
+        
+    try:
+        pdf_bytes = PDFGeneratorService.generate_report(result)
+        
+        filename = result.get("filename", "lemma_report.txt")
+        pdf_filename = filename.rsplit(".", 1)[0] + "_report.pdf"
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{pdf_filename}"'
+            }
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate PDF report: {str(e)}"
+        )
+
 
 
 @app.post(

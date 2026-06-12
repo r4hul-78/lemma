@@ -99,6 +99,9 @@
                                 <button class="btn btn-primary" id="btn-run-analysis" disabled>
                                     <i class="fa-solid fa-wand-magic-sparkles"></i> Run Analysis
                                 </button>
+                                <button class="btn btn-outline hidden" id="btn-download-pdf">
+                                    <i class="fa-solid fa-file-pdf"></i> Download PDF
+                                </button>
                             </div>
                         </div>
                         
@@ -285,7 +288,50 @@
                             </div>
                         </div>
                     </div>
-                </aside>
+            </div>
+
+            <!-- Reports History Workspace [NEW] -->
+            <div class="content-grid hidden" id="reports-workspace">
+                <!-- Left Panel: Reports List Table -->
+                <section class="left-panel panel" style="grid-column: span 12;">
+                    <div class="panel-header-row">
+                        <div>
+                            <h3>Reports History</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                                Access past analyses and download compiled academic integrity PDF reports.
+                            </p>
+                        </div>
+                        <button class="btn btn-sm btn-outline" id="btn-clear-history">
+                            <i class="fa-solid fa-trash-can"></i> Clear History
+                        </button>
+                    </div>
+
+                    <div class="reports-table-container">
+                        <table class="reports-table" id="reports-table">
+                            <thead>
+                                <tr>
+                                    <th>Document Filename</th>
+                                    <th>Date Generated</th>
+                                    <th>Plagiarism Score</th>
+                                    <th>Analysis Status</th>
+                                    <th style="text-align: right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reports-table-body">
+                                <!-- Dynamic rows inserted here -->
+                            </tbody>
+                        </table>
+
+                        <!-- Empty State View -->
+                        <div class="empty-state-view hidden" id="reports-empty-state">
+                            <div class="icon-circle">
+                                <i class="fa-solid fa-file-invoice"></i>
+                            </div>
+                            <h3>No Reports Generated Yet</h3>
+                            <p>Ingest and analyze documents in the Plagiarism Checker to build your integrity reports archive.</p>
+                        </div>
+                    </div>
+                </section>
             </div>
         </main>
     </div>
