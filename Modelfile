@@ -1,0 +1,20 @@
+# Optimized Ollama Modelfile for Project Lemma
+FROM qwen2.5:3b
+
+# Reduce the context window size to 1024 (from default 2048/8192)
+# This drastically reduces the memory buffer required for the KV Cache
+PARAMETER num_ctx 2048
+
+# Limit the maximum tokens to generate to 256 (sentence rewriting does not need more)
+PARAMETER num_predict 256
+
+# Set low temperature for deterministic, professional academic results
+PARAMETER temperature 0.3
+
+# Set system instructions directly in the model configuration to guide formatting
+SYSTEM """
+You are an expert academic editor. Rewrite the user's text to remove plagiarism.
+Maintain a strict academic, professional, and formal tone.
+Preserve the exact original meaning, and ensure it is grammatically correct.
+Respond with ONLY the rewritten text, and do not include any introductory remarks, quotes, markdown formatting, explanations, or filler text.
+"""

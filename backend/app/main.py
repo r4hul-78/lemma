@@ -1,9 +1,14 @@
+import uuid
+# pyrefly: ignore [missing-import]
+from celery.result import AsyncResult
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.app.config import settings
 from backend.app.schemas.document import DocumentUploadResponse, SentenceCoordinate
+from backend.app.schemas.rewrite import RewriteRequest, RewriteResponse
 from backend.app.services.extractor import (
     DocumentExtractorService,
     FileSizeExceededError,
@@ -12,6 +17,9 @@ from backend.app.services.extractor import (
 )
 from backend.app.services.segmenter import SentenceSegmenterService
 from backend.app.services.matcher import DualTierMatcher
+from backend.app.services.llm import LLMService
+from backend.app.tasks.celery_app import celery_app
+from backend.app.tasks.analysis import analyze_document_task
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -122,6 +130,134 @@ async def upload_document(file: UploadFile = File(...)):
         sentences=sentences,
         analysis=analysis_report
     )
+
+@app.post(
+    f"{settings.API_V1_STR}/analyze",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Asynchronously analyze a document for plagiarism",
+    description="Saves document to disk and queues background analysis task, returning a job ID immediately."
+)
+@app.post(
+    "/api/analyze",
+    status_code=status.HTTP_202_ACCEPTED,
+    include_in_schema=False
+)
+async def analyze_document_async(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No filename provided in upload request."
+        )
+        
+    # Validate extension using settings before writing to disk
+    file_ext = file.filename.split(".")[-1].lower()
+    if file_ext not in settings.ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file type: .{file_ext}. Allowed types: {', '.join(settings.ALLOWED_EXTENSIONS)}"
+        )
+        
+    # Generate UUID and setup paths
+    job_id = str(uuid.uuid4())
+    temp_filename = f"{job_id}_{file.filename}"
+    temp_filepath = settings.UPLOAD_DIR / temp_filename
+    
+    # Read and save in chunks to check file size limit
+    content_size = 0
+    max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+    
+    try:
+        with open(temp_filepath, "wb") as f:
+            while chunk := await file.read(8192):
+                content_size += len(chunk)
+                if content_size > max_bytes:
+                    raise FileSizeExceededError(f"File size exceeds limit of {settings.MAX_FILE_SIZE_MB}MB.")
+                f.write(chunk)
+    except FileSizeExceededError as e:
+        if temp_filepath.exists():
+            temp_filepath.unlink()
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=str(e)
+        )
+    except Exception as e:
+        if temp_filepath.exists():
+            temp_filepath.unlink()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save temporary file: {str(e)}"
+        )
+
+    # Trigger celery task with custom task ID matching the job ID
+    analyze_document_task.apply_async(
+        args=[str(temp_filepath), file.filename],
+        task_id=job_id
+    )
+    
+    return {
+        "job_id": job_id,
+        "status": "pending"
+    }
+
+
+@app.get(
+    f"{settings.API_V1_STR}/status/{{job_id}}",
+    status_code=status.HTTP_200_OK,
+    summary="Get background task status and results",
+    description="Check the current execution status of an async document plagiarism analysis task."
+)
+@app.get(
+    "/api/status/{job_id}",
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False
+)
+async def get_job_status(job_id: str):
+    res = AsyncResult(job_id, app=celery_app)
+    
+    if res.state == "SUCCESS":
+        return {
+            "job_id": job_id,
+            "status": "completed",
+            "result": res.result
+        }
+    elif res.state == "FAILURE":
+        return {
+            "job_id": job_id,
+            "status": "failed",
+            "error": str(res.result)
+        }
+    elif res.state in ("PENDING", "RECEIVED"):
+        return {
+            "job_id": job_id,
+            "status": "pending"
+        }
+    else:  # STARTED, RETRY, etc.
+        return {
+            "job_id": job_id,
+            "status": "processing"
+        }
+
+
+@app.post(
+    f"{settings.API_V1_STR}/rewrite",
+    response_model=RewriteResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Rewrite a text segment to eliminate plagiarism",
+    description="Uses a local LLM via Ollama to paraphrase a sentence with a professional academic tone."
+)
+@app.post(
+    "/api/rewrite",
+    response_model=RewriteResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False
+)
+async def rewrite_text_endpoint(payload: RewriteRequest):
+    rewritten = await LLMService.rewrite_text(payload.text, tone=payload.tone)
+    return RewriteResponse(
+        original_text=payload.text,
+        rewritten_text=rewritten
+    )
+
 
 # Serve static frontend files
 FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"

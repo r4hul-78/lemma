@@ -10,6 +10,7 @@ TEST_INDEX_PATH = settings.BASE_DIR / "data" / "test_lemma_vectors.index"
 
 settings.SQLITE_DB_PATH = TEST_DB_PATH
 settings.FAISS_INDEX_PATH = TEST_INDEX_PATH
+settings.CELERY_ALWAYS_EAGER = True
 
 from fastapi.testclient import TestClient
 from backend.app.main import app

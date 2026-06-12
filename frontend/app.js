@@ -6,6 +6,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // API URL configuration
     const API_BASE_URL = "http://localhost:8000";
     const API_UPLOAD_URL = `${API_BASE_URL}/api/v1/documents/upload`;
+    const API_ANALYZE_URL = `${API_BASE_URL}/api/v1/analyze`;
+    const API_STATUS_URL = `${API_BASE_URL}/api/v1/status`;
+    const API_REWRITE_URL = `${API_BASE_URL}/api/v1/rewrite`;
     const API_HEALTH_URL = `${API_BASE_URL}/api/v1/health`;
 
     // DOM Elements
@@ -135,7 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* -------------------------------------------------------------
-     * Document Upload Service Call
+     * Document Upload Service Call (Async Queue Flow)
      * ------------------------------------------------------------- */
     async function uploadDocument(file) {
         // Update Metadata sidebar indicators
@@ -143,13 +146,13 @@ document.addEventListener("DOMContentLoaded", () => {
         metaStatus.innerHTML = '<span class="badge badge-dim">Uploading...</span>';
         
         // Show loading progress
-        showToast(`Uploading and parsing ${file.name}...`, "info");
+        showToast(`Uploading ${file.name}...`, "info");
         
         const formData = new FormData();
         formData.append("file", file);
 
         try {
-            const response = await fetch(API_UPLOAD_URL, {
+            const response = await fetch(API_ANALYZE_URL, {
                 method: "POST",
                 body: formData
             });
@@ -157,25 +160,64 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.detail || "Failed to parse document");
+                throw new Error(data.detail || "Failed to initiate analysis");
             }
 
-            uploadResponseData = data;
-            showToast("Document segmented successfully!", "success");
+            const jobId = data.job_id;
+            metaStatus.innerHTML = '<span class="badge badge-dim">Queued...</span>';
+            showToast("Analysis job queued on worker.", "info");
             
-            // Render Document Viewer
-            renderDocument(data);
+            // Start polling status
+            pollJobStatus(jobId, file.name);
             
-            // Enable analysis button trigger (Phase 2)
-            btnRunAnalysis.disabled = false;
         } catch (error) {
-            console.error("Upload Error:", error);
+            console.error("Upload/Queue Error:", error);
             showToast(error.message, "error");
             
             // Reset metadata card on failure
             metaFilename.textContent = "No file uploaded";
             metaStatus.innerHTML = '<span class="badge badge-dim">Idle</span>';
         }
+    }
+
+    async function pollJobStatus(jobId, filename) {
+        const interval = setInterval(async () => {
+            try {
+                const response = await fetch(`${API_STATUS_URL}/${jobId}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || "Status check failed");
+                }
+                
+                if (data.status === "completed") {
+                    clearInterval(interval);
+                    uploadResponseData = data.result;
+                    showToast("Document analysis complete!", "success");
+                    
+                    // Render Document Viewer
+                    renderDocument(uploadResponseData);
+                    
+                    // Enable analysis button trigger
+                    btnRunAnalysis.disabled = false;
+                    metaStatus.innerHTML = '<span class="badge badge-dim">Ready</span>';
+                } else if (data.status === "failed") {
+                    clearInterval(interval);
+                    throw new Error(data.error || "Analysis task failed");
+                } else if (data.status === "processing") {
+                    metaStatus.innerHTML = '<span class="badge badge-dim">Analyzing...</span>';
+                } else {
+                    metaStatus.innerHTML = '<span class="badge badge-dim">Queued...</span>';
+                }
+            } catch (error) {
+                clearInterval(interval);
+                console.error("Polling Error:", error);
+                showToast(error.message, "error");
+                
+                metaFilename.textContent = "No file uploaded";
+                metaStatus.innerHTML = '<span class="badge badge-dim">Failed</span>';
+            }
+        }, 1000);
     }
 
     /* -------------------------------------------------------------
@@ -274,6 +316,12 @@ document.addEventListener("DOMContentLoaded", () => {
         inspectStart.textContent = sentence.start_char;
         inspectEnd.textContent = sentence.end_char;
         inspectText.textContent = `"${sentence.text}"`;
+
+        // Hide paraphrase result block from previous inspect runs
+        const paraphraseBlock = document.getElementById("paraphrase-result-block");
+        if (paraphraseBlock) {
+            paraphraseBlock.classList.add("hidden");
+        }
 
         const matchDetailsDiv = document.getElementById("plagiarism-match-details");
         const inspectMatchRefText = document.getElementById("inspect-match-ref-text");
@@ -426,6 +474,10 @@ document.addEventListener("DOMContentLoaded", () => {
         // Reset Inspector state
         inspectorPlaceholder.classList.remove("hidden");
         inspectorData.classList.add("hidden");
+        const paraphraseBlock = document.getElementById("paraphrase-result-block");
+        if (paraphraseBlock) {
+            paraphraseBlock.classList.add("hidden");
+        }
         document.querySelectorAll(".doc-sentence").forEach(s => {
             s.className = "doc-sentence";
             s.removeAttribute("data-match");
@@ -521,28 +573,165 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 1200);
     });
 
-    // Paraphrase button triggers UI alert
-    btnQuickParaphrase.addEventListener("click", () => {
-        const sentenceText = inspectText.textContent.replace(/"/g, "");
-        showToast(`Sending segment to local Ollama rewriter: "${sentenceText.substring(0, 30)}..."`, "info");
+    // Paraphrase button triggers Ollama API call
+    btnQuickParaphrase.addEventListener("click", async () => {
+        const sentenceText = inspectText.textContent.replace(/^"|"$/g, "").trim();
+        if (!sentenceText) return;
+
+        const paraphraseBlock = document.getElementById("paraphrase-result-block");
+        const paraphraseText = document.getElementById("inspect-paraphrase-text");
+        
+        // Disable button and show spinner
+        btnQuickParaphrase.disabled = true;
+        btnQuickParaphrase.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Paraphrasing...';
+        showToast("Paraphrasing segment with local Ollama...", "info");
+
+        try {
+            const response = await fetch(API_REWRITE_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ text: sentenceText })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || "Paraphrasing failed");
+            }
+
+            // Show result
+            paraphraseText.textContent = `"${data.rewritten_text}"`;
+            paraphraseBlock.classList.remove("hidden");
+            showToast("Sentence paraphrased successfully!", "success");
+        } catch (error) {
+            console.error("Paraphrase Error:", error);
+            showToast(error.message, "error");
+        } finally {
+            // Restore button
+            btnQuickParaphrase.disabled = false;
+            btnQuickParaphrase.innerHTML = '<i class="fa-solid fa-pen-nib"></i> Paraphrase Segment';
+        }
     });
 
     /* -------------------------------------------------------------
-     * Sidebar Nav Navigation & Theme Styling Mock
+     * Sidebar Nav Navigation & Workspace Switching
      * ------------------------------------------------------------- */
     const navItems = document.querySelectorAll(".nav-item");
+    const dashboardWorkspace = document.getElementById("dashboard-workspace");
+    const paraphraserWorkspace = document.getElementById("paraphraser-workspace");
+
     navItems.forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
-            navItems.forEach(n => n.classList.remove("active"));
-            item.classList.add("active");
             
             const tabId = item.id;
             if (tabId === "nav-dashboard" || tabId === "nav-plagiarism") {
-                // Keep showing dashboard
+                // Activate both dashboard & plagiarism links in sidebar to keep them synced
+                navItems.forEach(n => n.classList.remove("active"));
+                document.getElementById("nav-dashboard").classList.add("active");
+                document.getElementById("nav-plagiarism").classList.add("active");
+                
+                dashboardWorkspace.classList.remove("hidden");
+                paraphraserWorkspace.classList.add("hidden");
+            } else if (tabId === "nav-paraphraser") {
+                navItems.forEach(n => n.classList.remove("active"));
+                item.classList.add("active");
+                
+                dashboardWorkspace.classList.add("hidden");
+                paraphraserWorkspace.classList.remove("hidden");
             } else {
-                showToast(`${item.textContent.trim()} workspace module is coming in Phase 3/4.`, "info");
+                showToast(`${item.textContent.trim()} workspace module is coming in Phase 4/5.`, "info");
             }
+        });
+    });
+
+    /* -------------------------------------------------------------
+     * Plagiarism-Free Generator Workspace Logic [NEW]
+     * ------------------------------------------------------------- */
+    const paraInputText = document.getElementById("para-input-text");
+    const paraOutputRender = document.getElementById("para-output-render");
+    const btnRunParaphrase = document.getElementById("btn-run-paraphrase");
+    const btnCopyParaphrase = document.getElementById("btn-copy-paraphrase");
+    const paraTone = document.getElementById("para-tone");
+    const paraOrigWords = document.getElementById("para-orig-words");
+    const paraNewWords = document.getElementById("para-new-words");
+
+    // Track word counts on input change
+    paraInputText.addEventListener("input", () => {
+        const text = paraInputText.value.trim();
+        const wordCount = text ? text.split(/\s+/).length : 0;
+        paraOrigWords.textContent = wordCount;
+    });
+
+    // Run Paraphrase Action
+    btnRunParaphrase.addEventListener("click", async () => {
+        const textToParaphrase = paraInputText.value.trim();
+        if (!textToParaphrase) {
+            showToast("Please enter some text to paraphrase.", "error");
+            return;
+        }
+
+        // Disable button, show loading spinner
+        btnRunParaphrase.disabled = true;
+        btnRunParaphrase.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Paraphrasing...';
+        paraOutputRender.innerHTML = '<span class="placeholder-text"><i class="fa-solid fa-spinner fa-spin"></i> Generating plagiarism-free text...</span>';
+        btnCopyParaphrase.disabled = true;
+        paraNewWords.textContent = "0";
+
+        showToast("Paraphrasing text with local Llama3...", "info");
+
+        try {
+            const response = await fetch(API_REWRITE_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ 
+                    text: textToParaphrase,
+                    tone: paraTone.value
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || "Paraphrasing failed");
+            }
+
+            // Render result
+            paraOutputRender.innerHTML = escapeHtml(data.rewritten_text);
+            
+            // Calculate new word count
+            const wordsNew = data.rewritten_text.trim().split(/\s+/).length;
+            paraNewWords.textContent = wordsNew;
+
+            // Enable copy button
+            btnCopyParaphrase.disabled = false;
+            
+            showToast("Text paraphrased successfully!", "success");
+        } catch (error) {
+            console.error("Paraphrase Workspace Error:", error);
+            paraOutputRender.innerHTML = `<span class="placeholder-text" style="color: #ef4444; font-style: normal;"><i class="fa-solid fa-circle-exclamation"></i> Error: ${escapeHtml(error.message)}</span>`;
+            showToast(error.message, "error");
+        } finally {
+            // Restore button
+            btnRunParaphrase.disabled = false;
+            btnRunParaphrase.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Paraphrase Text';
+        }
+    });
+
+    // Copy to Clipboard Action
+    btnCopyParaphrase.addEventListener("click", () => {
+        const textToCopy = paraOutputRender.textContent;
+        if (!textToCopy) return;
+
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            showToast("Copied paraphrased text to clipboard!", "success");
+        }).catch(err => {
+            console.error("Clipboard Error:", err);
+            showToast("Failed to copy text.", "error");
         });
     });
 });

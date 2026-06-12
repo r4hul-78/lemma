@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"
+    CELERY_ALWAYS_EAGER: bool = True
+    
+    # Ollama settings
+    OLLAMA_URL: str = "http://127.0.0.1:11434"
+    OLLAMA_MODEL: str = "lemma-model"
     
     # Firebase settings (to be integrated fully in Phase 4)
     FIREBASE_CREDENTIALS_PATH: str | None = None

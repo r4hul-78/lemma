@@ -68,7 +68,7 @@
             </header>
 
             <!-- Dashboard Content Grid -->
-            <div class="content-grid">
+            <div class="content-grid" id="dashboard-workspace">
                 
                 <!-- Left Panel: Ingestion or Viewer -->
                 <section class="left-panel panel">
@@ -216,9 +216,73 @@
                             </div>
                             
                             <!-- Paraphrase Action Button -->
+                            <div class="inspector-text-block hidden" id="paraphrase-result-block">
+                                <label>Paraphrased Text (Academic Rewrite)</label>
+                                <blockquote id="inspect-paraphrase-text" style="border-left-color: var(--primary-color);">""</blockquote>
+                            </div>
+
                             <button class="btn btn-full btn-outline" id="btn-quick-paraphrase">
                                 <i class="fa-solid fa-pen-nib"></i> Paraphrase Segment
                             </button>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+
+            <!-- Paraphraser Content Grid [NEW] -->
+            <div class="content-grid hidden" id="paraphraser-workspace">
+                <!-- Left Panel: Text Input -->
+                <section class="left-panel panel">
+                    <div class="panel-header-row">
+                        <h3>Plagiarism-Free Generator</h3>
+                        <span class="badge badge-purple">Ollama Llama3</span>
+                    </div>
+                    <div class="textarea-container">
+                        <textarea id="para-input-text" placeholder="Paste your plagiarized sentence, paragraph, or document text here..."></textarea>
+                    </div>
+                    <div class="panel-footer-row">
+                        <div class="tone-selector">
+                            <label for="para-tone"><i class="fa-solid fa-sliders"></i> Tone:</label>
+                            <select id="para-tone">
+                                <option value="academic">Academic & Professional</option>
+                                <option value="standard">Standard</option>
+                                <option value="creative">Creative</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="btn-run-paraphrase">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Paraphrase Text
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Right Panel: Paraphrased Output -->
+                <aside class="right-panel">
+                    <div class="panel output-card">
+                        <div class="card-header-row">
+                            <h3>Paraphrased Output</h3>
+                            <button class="btn btn-sm btn-outline" id="btn-copy-paraphrase" disabled>
+                                <i class="fa-regular fa-copy"></i> Copy
+                            </button>
+                        </div>
+                        <div class="output-scroller">
+                            <div class="paraphrased-content-render" id="para-output-render">
+                                <span class="placeholder-text">Paraphrased text will be generated here...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Side-by-side comparative metadata -->
+                    <div class="panel diff-metadata-card">
+                        <h3>Comparison Summary</h3>
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <span class="stat-label">Original Words</span>
+                                <span class="stat-value" id="para-orig-words">0</span>
+                            </div>
+                            <div class="stat-box">
+                                <span class="stat-label">Paraphrased Words</span>
+                                <span class="stat-value" id="para-new-words">0</span>
+                            </div>
                         </div>
                     </div>
                 </aside>
