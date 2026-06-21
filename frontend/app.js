@@ -4,7 +4,7 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     // API URL configuration
-    const API_BASE_URL = process.env.BACKEND_API_URL || "http://localhost:8000";
+    const API_BASE_URL = https://r4hul-78-lemma-backend.hf.space;
     const API_UPLOAD_URL = `${API_BASE_URL}/api/v1/documents/upload`;
     const API_ANALYZE_URL = `${API_BASE_URL}/api/v1/analyze`;
     const API_STATUS_URL = `${API_BASE_URL}/api/v1/status`;
