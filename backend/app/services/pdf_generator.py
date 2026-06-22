@@ -66,7 +66,12 @@ class PDFGeneratorService:
                         if rel_start > last_sent_idx:
                             sent_html.append(html.escape(sent_text[last_sent_idx:rel_start]))
                         
-                        mark_class = "mark-lexical" if match["match_type"] == "lexical" else "mark-semantic"
+                        if match["match_type"] == "lexical":
+                            mark_class = "mark-lexical"
+                        elif match["match_type"] == "hybrid":
+                            mark_class = "mark-hybrid"
+                        else:
+                            mark_class = "mark-semantic"
                         sent_html.append(f'<mark class="{mark_class}">{html.escape(sent_text[rel_start:rel_end])}</mark>')
                         last_sent_idx = rel_end
                         
@@ -75,7 +80,12 @@ class PDFGeneratorService:
                     
                     sentence_html_content = "".join(sent_html)
                 else:
-                    mark_class = "mark-lexical" if match["match_type"] == "lexical" else "mark-semantic"
+                    if match["match_type"] == "lexical":
+                        mark_class = "mark-lexical"
+                    elif match["match_type"] == "hybrid":
+                        mark_class = "mark-hybrid"
+                    else:
+                        mark_class = "mark-semantic"
                     sentence_html_content = f'<mark class="{mark_class}">{html.escape(sent_text)}</mark>'
             else:
                 sentence_html_content = html.escape(sent_text)
@@ -108,12 +118,14 @@ class PDFGeneratorService:
         plag_sents_count = analysis.get("plagiarized_sentences_count", 0)
         lexical_count = analysis.get("lexical_matches_count", 0)
         semantic_count = analysis.get("semantic_matches_count", 0)
+        hybrid_count = analysis.get("hybrid_matches_count", 0)
         matches = analysis.get("matches", [])
         
         # Calculate percentages
         lexical_pct = int(round((lexical_count / total_sents) * 100)) if total_sents > 0 else 0
         semantic_pct = int(round((semantic_count / total_sents) * 100)) if total_sents > 0 else 0
-        original_pct = max(0, 100 - lexical_pct - semantic_pct)
+        hybrid_pct = int(round((hybrid_count / total_sents) * 100)) if total_sents > 0 else 0
+        original_pct = max(0, 100 - lexical_pct - semantic_pct - hybrid_pct)
         
         # Format current timestamp
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -188,8 +200,8 @@ class PDFGeneratorService:
                 ref_citation = f"{m['matched_sentence']['doc_author']} — {m['matched_sentence']['doc_source']}"
                 score_pct = int(round(m["score"] * 100))
                 m_type = m["match_type"]
-                type_label = "Lexical Match" if m_type == "lexical" else "Semantic Match"
-                badge_class = "badge-lexical" if m_type == "lexical" else "badge-semantic"
+                type_label = "Lexical Match" if m_type == "lexical" else ("Hybrid Match" if m_type == "hybrid" else "Semantic Match")
+                badge_class = "badge-lexical" if m_type == "lexical" else ("badge-hybrid" if m_type == "hybrid" else "badge-semantic")
                 
                 detailed_comparisons += f"""
                 <div class="match-item">
@@ -341,7 +353,7 @@ class PDFGeneratorService:
             padding: 12px;
             text-align: center;
             background-color: #ffffff;
-            width: 25%;
+            width: 20%;
         }}
 
         .metric-card.primary {{
@@ -391,6 +403,12 @@ class PDFGeneratorService:
             border-bottom: 1px solid #d8b4fe;
         }}
 
+        .mark-hybrid {{
+            background-color: #fef3c7;
+            color: #92400e;
+            border-bottom: 1px solid #fde68a;
+        }}
+
         /* Tables */
         table.sources-table {{
             width: 100%;
@@ -425,16 +443,22 @@ class PDFGeneratorService:
             letter-spacing: 0.5px;
         }}
 
-        .badge-lexical, .badge-lexical {{
+        .badge-lexical {{
             background-color: #fee2e2;
             color: #991b1b;
             border: 1px solid #fca5a5;
         }}
 
-        .badge-semantic, .badge-semantic {{
+        .badge-semantic {{
             background-color: #f3e8ff;
             color: #6b21a8;
             border: 1px solid #d8b4fe;
+        }}
+
+        .badge-hybrid {{
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
         }}
 
         /* Detailed Comparisons */
@@ -544,6 +568,11 @@ class PDFGeneratorService:
                     <div class="metric-label">Lexical Matches</div>
                     <div class="metric-value" style="color: #ef4444;">{lexical_pct}%</div>
                     <div style="font-size: 7.5pt; color: #64748b;">{lexical_count} sentence(s)</div>
+                </td>
+                <td class="metric-card">
+                    <div class="metric-label">Hybrid Matches</div>
+                    <div class="metric-value" style="color: #f59e0b;">{hybrid_pct}%</div>
+                    <div style="font-size: 7.5pt; color: #64748b;">{hybrid_count} sentence(s)</div>
                 </td>
                 <td class="metric-card">
                     <div class="metric-label">Semantic Matches</div>

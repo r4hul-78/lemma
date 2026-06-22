@@ -120,17 +120,37 @@ async def upload_document(file: UploadFile = File(...)):
     ]
     
     # Perform Phase 2 Plagiarism Analysis
-    matcher = get_matcher()
-    analysis_report = matcher.analyze_document(sentences_data)
-    
-    return DocumentUploadResponse(
-        filename=file.filename,
-        text=text,
-        char_count=len(text),
-        sentence_count=len(sentences),
-        sentences=sentences,
-        analysis=analysis_report
-    )
+    job_id = str(uuid.uuid4())
+    try:
+        if settings.ENABLE_ONLINE_RETRIEVAL:
+            try:
+                from backend.app.services.online_retriever import OnlineRetrieverService
+                queries = OnlineRetrieverService.extract_search_queries(text)
+                candidates = await OnlineRetrieverService.get_online_candidates(queries)
+                await OnlineRetrieverService.seed_ephemeral_candidates(job_id, candidates)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Online candidate caching failed for upload: {e}")
+                
+        matcher = get_matcher()
+        analysis_report = matcher.analyze_document(sentences_data, job_id=job_id)
+        
+        return DocumentUploadResponse(
+            filename=file.filename,
+            text=text,
+            char_count=len(text),
+            sentence_count=len(sentences),
+            sentences=sentences,
+            analysis=analysis_report
+        )
+    finally:
+        if settings.ENABLE_ONLINE_RETRIEVAL:
+            try:
+                from backend.app.services.online_retriever import OnlineRetrieverService
+                OnlineRetrieverService.prune_cache(job_id)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Failed to prune cache for upload job {job_id}: {e}")
 
 @app.post(
     f"{settings.API_V1_STR}/analyze",

@@ -26,6 +26,10 @@ uploads/
 backend/uploads/
 backend/app/uploads/
 
+# AI Agent Context Files
+lemma/Project Context/
+Project Context
+
 # IDEs and Editors
 .vscode/
 .idea/

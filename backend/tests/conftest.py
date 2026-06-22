@@ -5,36 +5,57 @@ from docx import Document
 
 # Override settings to use a test database and index BEFORE importing app or other components
 from backend.app.config import settings
-TEST_DB_PATH = settings.BASE_DIR / "data" / "test_lemma.db"
-TEST_INDEX_PATH = settings.BASE_DIR / "data" / "test_lemma_vectors.index"
-
-settings.SQLITE_DB_PATH = TEST_DB_PATH
-settings.FAISS_INDEX_PATH = TEST_INDEX_PATH
+settings.POSTGRES_DB = "test_lemma"
 settings.CELERY_ALWAYS_EAGER = True
+settings.ENABLE_ONLINE_RETRIEVAL = False
 
 from fastapi.testclient import TestClient
 from backend.app.main import app
 
 @pytest.fixture(scope="session", autouse=True)
 def clean_test_db_and_index():
-    """Ensures test database and index files are cleaned up before and after the test session."""
-    # Setup: remove any existing test database or index files
-    for p in (TEST_DB_PATH, TEST_INDEX_PATH):
-        if p.exists():
-            try:
-                p.unlink()
-            except Exception:
-                pass
-                
+    """Ensures test database tables and ES index are initialized and cleaned up."""
+    from backend.app.services.database import DatabaseService
+    from backend.app.services.elasticsearch_client import get_es_client, initialize_es
+    
+    # Initialize DB (creates extension, tables, HNSW index)
+    try:
+        DatabaseService.initialize_db()
+    except Exception as e:
+        pytest.skip(f"PostgreSQL connection failed: {e}. Make sure the Docker services are running.")
+        
+    # Initialize Elasticsearch index
+    try:
+        initialize_es()
+    except Exception as e:
+        pytest.skip(f"Elasticsearch connection failed: {e}. Make sure the Docker services are running.")
+        
+    # Truncate tables before tests
+    with DatabaseService.get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("TRUNCATE TABLE sentences, documents CASCADE;")
+        conn.commit()
+        
+    # Delete and recreate index for clean test state
+    es = get_es_client()
+    index_name = "reference_sentences"
+    try:
+        if es.indices.exists(index=index_name):
+            es.indices.delete(index=index_name)
+        initialize_es()
+    except Exception as e:
+        pytest.skip(f"Elasticsearch re-initialization failed: {e}")
+    
     yield
     
-    # Teardown: clean up test database and index files
-    for p in (TEST_DB_PATH, TEST_INDEX_PATH):
-        if p.exists():
-            try:
-                p.unlink()
-            except Exception:
-                pass
+    # Teardown: truncate tables again
+    try:
+        with DatabaseService.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("TRUNCATE TABLE sentences, documents CASCADE;")
+            conn.commit()
+    except Exception:
+        pass
 
 @pytest.fixture(scope="module")
 def client():

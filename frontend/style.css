@@ -1240,6 +1240,10 @@ body {
     background-color: rgba(239, 68, 68, 0.08);
 }
 
+.doc-sentence.plagiarized.match-hybrid:hover {
+    background-color: rgba(245, 158, 11, 0.08);
+}
+
 .doc-sentence.plagiarized.match-semantic:hover {
     background-color: rgba(139, 92, 246, 0.08);
 }
@@ -1247,6 +1251,11 @@ body {
 .doc-sentence.plagiarized.match-lexical.active {
     background-color: rgba(239, 68, 68, 0.12);
     box-shadow: 0 0 10px rgba(239, 68, 68, 0.15);
+}
+
+.doc-sentence.plagiarized.match-hybrid.active {
+    background-color: rgba(245, 158, 11, 0.12);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);
 }
 
 .doc-sentence.plagiarized.match-semantic.active {
@@ -1268,6 +1277,15 @@ mark.mark-semantic {
     background-color: rgba(139, 92, 246, 0.18);
     color: #c084fc;
     border-bottom: 2.5px solid #8b5cf6;
+    font-weight: 500;
+    padding: 0 1px;
+    border-radius: 2px;
+}
+
+mark.mark-hybrid {
+    background-color: rgba(245, 158, 11, 0.18);
+    color: #f59e0b;
+    border-bottom: 2.5px solid #f59e0b;
     font-weight: 500;
     padding: 0 1px;
     border-radius: 2px;
@@ -1319,6 +1337,12 @@ mark.mark-semantic {
     background-color: rgba(139, 92, 246, 0.1) !important;
     color: #c084fc !important;
     border: 1px solid rgba(139, 92, 246, 0.2) !important;
+}
+
+.badge-orange {
+    background-color: rgba(245, 158, 11, 0.1) !important;
+    color: #f59e0b !important;
+    border: 1px solid rgba(245, 158, 11, 0.2) !important;
 }
 
 /* -------------------------------------------------------------
@@ -1383,6 +1407,11 @@ mark.mark-semantic {
 .legend-semantic {
     background-color: #8b5cf6;
     box-shadow: 0 0 6px rgba(139, 92, 246, 0.4);
+}
+
+.legend-hybrid {
+    background-color: #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
 }
 
 .legend-original {

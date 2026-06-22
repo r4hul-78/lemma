@@ -50,8 +50,24 @@ class Settings(BaseSettings):
     MOCK_DATABASE_PATH: Path = BASE_DIR / "data" / "mock_references.json"
     LEXICAL_THRESHOLD: float = 0.70
     SEMANTIC_THRESHOLD: float = 0.65
+    HYBRID_THRESHOLD: float = 0.60
     
     # Database Settings
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "lemma"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    
+    # Elasticsearch Settings
+    ELASTICSEARCH_URL: str = "http://localhost:9200"
+    
+    # Online Retrieval Settings
+    ENABLE_ONLINE_RETRIEVAL: bool = True
+    SEMANTIC_SCHOLAR_API_KEY: str | None = None
+    MAX_ONLINE_CANDIDATES_PER_QUERY: int = 30
+    
+    # Deprecated/Fallback Settings
     SQLITE_DB_FILE: str = "lemma.db"
     SQLITE_DB_PATH: Path = BASE_DIR / "data" / "lemma.db"
     FAISS_INDEX_PATH: Path = BASE_DIR / "data" / "lemma_vectors.index"
@@ -71,7 +87,8 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="ignore"
+        extra="ignore",
+        env_prefix="LEMMA_"
     )
 
 settings = Settings()

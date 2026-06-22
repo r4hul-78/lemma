@@ -20,7 +20,7 @@ class MatchedSentenceInfo(BaseModel):
 class PlagiarismMatch(BaseModel):
     query_sentence: SentenceCoordinate = Field(..., description="The query sentence coordinates.")
     matched_sentence: MatchedSentenceInfo = Field(..., description="The matched reference sentence details.")
-    match_type: str = Field(..., description="Type of match: 'lexical' or 'semantic'.")
+    match_type: str = Field(..., description="Type of match: 'lexical', 'semantic', or 'hybrid'.")
     score: float = Field(..., description="Cosine similarity score.")
     highlights: list[MatchHighlight] = Field(..., description="Exact coordinate highlights within the sentence.")
 
@@ -30,7 +30,9 @@ class PlagiarismAnalysisReport(BaseModel):
     plagiarized_sentences_count: int = Field(..., description="Total matched sentences.")
     lexical_matches_count: int = Field(..., description="Count of lexical matches.")
     semantic_matches_count: int = Field(..., description="Count of semantic matches.")
+    hybrid_matches_count: int = Field(0, description="Count of hybrid matches.")
     matches: list[PlagiarismMatch] = Field(..., description="Sentence-by-sentence match details.")
+
 
 class DocumentUploadResponse(BaseModel):
     filename: str = Field(..., description="The name of the uploaded file.")

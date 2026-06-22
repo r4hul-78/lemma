@@ -4,7 +4,7 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     // API URL configuration
-    const API_BASE_URL = "http://localhost:8000";
+    const API_BASE_URL = 'https://r4hul-78-lemma-backend.hf.space'; //'http://localhost:8000'; 
     const API_UPLOAD_URL = `${API_BASE_URL}/api/v1/documents/upload`;
     const API_ANALYZE_URL = `${API_BASE_URL}/api/v1/analyze`;
     const API_STATUS_URL = `${API_BASE_URL}/api/v1/status`;
@@ -353,6 +353,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (matchData.match_type === "lexical") {
                 matchTypeBadge.className = "badge badge-red";
                 matchTypeBadge.textContent = "Lexical Match";
+            } else if (matchData.match_type === "hybrid") {
+                matchTypeBadge.className = "badge badge-orange";
+                matchTypeBadge.textContent = "Hybrid Match";
             } else {
                 matchTypeBadge.className = "badge badge-purple";
                 matchTypeBadge.textContent = "Semantic Match";
@@ -361,7 +364,10 @@ document.addEventListener("DOMContentLoaded", () => {
             // Set Match Score
             const pct = Math.round(matchData.score * 100);
             matchScoreBadge.textContent = `${pct}% Similarity`;
-            matchScoreBadge.className = "badge " + (matchData.match_type === "lexical" ? "badge-red" : "badge-purple");
+            matchScoreBadge.className = "badge " + (
+                matchData.match_type === "lexical" ? "badge-red" : 
+                (matchData.match_type === "hybrid" ? "badge-orange" : "badge-purple")
+            );
             
             // Set reference sentence and doc info
             inspectMatchRefText.textContent = `"${matchData.matched_sentence.text}"`;
@@ -420,7 +426,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 const text = span.textContent;
                 
                 span.classList.add("plagiarized");
-                span.classList.add(match.match_type === "lexical" ? "match-lexical" : "match-semantic");
+                if (match.match_type === "lexical") {
+                    span.classList.add("match-lexical");
+                } else if (match.match_type === "hybrid") {
+                    span.classList.add("match-hybrid");
+                } else {
+                    span.classList.add("match-semantic");
+                }
                 span.dataset.match = JSON.stringify(match);
 
                 // Re-render sentence text with word-level mark tags
@@ -439,7 +451,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (hl.start > lastIdx) {
                             htmlContent += escapeHtml(text.substring(lastIdx, hl.start));
                         }
-                        const markClass = match.match_type === "lexical" ? "mark-lexical" : "mark-semantic";
+                        const markClass = match.match_type === "lexical" ? "mark-lexical" : 
+                                          (match.match_type === "hybrid" ? "mark-hybrid" : "mark-semantic");
                         htmlContent += `<mark class="${markClass}">${escapeHtml(text.substring(hl.start, hl.end))}</mark>`;
                         lastIdx = hl.end;
                     });
@@ -450,7 +463,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     span.innerHTML = htmlContent;
                 } else {
-                    const markClass = match.match_type === "lexical" ? "mark-lexical" : "mark-semantic";
+                    const markClass = match.match_type === "lexical" ? "mark-lexical" : 
+                                      (match.match_type === "hybrid" ? "mark-hybrid" : "mark-semantic");
                     span.innerHTML = `<mark class="${markClass}">${escapeHtml(text)}</mark>`;
                 }
             } else {
@@ -510,6 +524,7 @@ document.addEventListener("DOMContentLoaded", () => {
         semanticChk.className = "checklist-item";
 
         document.getElementById("legend-val-lexical").textContent = "0%";
+        document.getElementById("legend-val-hybrid").textContent = "0%";
         document.getElementById("legend-val-semantic").textContent = "0%";
         document.getElementById("legend-val-original").textContent = "100%";
 
@@ -546,30 +561,35 @@ document.addEventListener("DOMContentLoaded", () => {
             // Calculate real percentages
             const total = analysis.total_sentences;
             const lexicalCount = analysis.lexical_matches_count;
+            const hybridCount = analysis.hybrid_matches_count || 0;
             const semanticCount = analysis.semantic_matches_count;
 
             const pctL = total > 0 ? Math.round((lexicalCount / total) * 100) : 0;
+            const pctH = total > 0 ? Math.round((hybridCount / total) * 100) : 0;
             const pctS = total > 0 ? Math.round((semanticCount / total) * 100) : 0;
-            const pctO = Math.max(0, 100 - pctL - pctS);
+            const pctO = Math.max(0, 100 - pctL - pctH - pctS);
 
             setTimeout(() => {
                 semanticChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Semantic Matching Complete';
                 
                 // Set circular progress middle text (overall plagiarism score)
-                const realPlagScore = pctL + pctS;
+                const realPlagScore = pctL + pctH + pctS;
                 progressScore.textContent = `${realPlagScore}%`;
                 
                 // Calculate conic gradient slices:
                 // Red (Lexical): 0 to pctL%
-                // Purple (Semantic): pctL% to (pctL + pctS)%
-                // Green (Original): (pctL + pctS)% to 100%
+                // Orange (Hybrid): pctL% to (pctL + pctH)%
+                // Purple (Semantic): (pctL + pctH)% to (pctL + pctH + pctS)%
+                // Green (Original): (pctL + pctH + pctS)% to 100%
                 const degL = pctL * 3.6;
+                const degH = pctH * 3.6;
                 const degS = pctS * 3.6;
                 
-                progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #8b5cf6 ${degL}deg ${degL + degS}deg, #10b981 ${degL + degS}deg 360deg)`;
+                progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #f59e0b ${degL}deg ${degL + degH}deg, #8b5cf6 ${degL + degH}deg ${degL + degH + degS}deg, #10b981 ${degL + degH + degS}deg 360deg)`;
                 
                 // Update Legend Values
                 document.getElementById("legend-val-lexical").textContent = `${pctL}%`;
+                document.getElementById("legend-val-hybrid").textContent = `${pctH}%`;
                 document.getElementById("legend-val-semantic").textContent = `${pctS}%`;
                 document.getElementById("legend-val-original").textContent = `${pctO}%`;
 
@@ -910,20 +930,24 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const total = analysis.total_sentences;
         const lexicalCount = analysis.lexical_matches_count;
+        const hybridCount = analysis.hybrid_matches_count || 0;
         const semanticCount = analysis.semantic_matches_count;
 
         const pctL = total > 0 ? Math.round((lexicalCount / total) * 100) : 0;
+        const pctH = total > 0 ? Math.round((hybridCount / total) * 100) : 0;
         const pctS = total > 0 ? Math.round((semanticCount / total) * 100) : 0;
-        const pctO = Math.max(0, 100 - pctL - pctS);
+        const pctO = Math.max(0, 100 - pctL - pctH - pctS);
         
-        const realPlagScore = pctL + pctS;
+        const realPlagScore = pctL + pctH + pctS;
         progressScore.textContent = `${realPlagScore}%`;
         
         const degL = pctL * 3.6;
+        const degH = pctH * 3.6;
         const degS = pctS * 3.6;
-        progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #8b5cf6 ${degL}deg ${degL + degS}deg, #10b981 ${degL + degS}deg 360deg)`;
+        progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #f59e0b ${degL}deg ${degL + degH}deg, #8b5cf6 ${degL + degH}deg ${degL + degH + degS}deg, #10b981 ${degL + degH + degS}deg 360deg)`;
         
         document.getElementById("legend-val-lexical").textContent = `${pctL}%`;
+        document.getElementById("legend-val-hybrid").textContent = `${pctH}%`;
         document.getElementById("legend-val-semantic").textContent = `${pctS}%`;
         document.getElementById("legend-val-original").textContent = `${pctO}%`;
 
