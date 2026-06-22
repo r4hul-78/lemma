@@ -14,3 +14,5 @@ celery>=5.3.6
 redis>=5.0.2
 weasyprint>=61.2
 faiss-cpu>=1.8.0
+sqlalchemy
+psycopg2-binary

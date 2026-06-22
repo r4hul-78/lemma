@@ -2,6 +2,8 @@ import uuid
 # pyrefly: ignore [missing-import]
 from celery.result import AsyncResult
 # pyrefly: ignore [missing-import]
+import os
+from sqlalchemy import create_engine
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -21,6 +23,16 @@ from backend.app.services.matcher import DualTierMatcher
 from backend.app.services.llm import LLMService
 from backend.app.tasks.celery_app import celery_app
 from backend.app.tasks.analysis import analyze_document_task
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+else:
+   DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/lemma"
+
+engine = create_engine(DATABASE_URL)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
