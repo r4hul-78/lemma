@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
+from backend.app.config import settings
 from backend.app.services.extractor import (
     DocumentExtractorService,
     FileSizeExceededError,
@@ -57,10 +58,14 @@ def test_extract_pdf_encrypted_fails(mock_pdf_reader_class):
         DocumentExtractorService.extract_text("test.pdf", b"mock_pdf_bytes")
 
 def test_file_size_exceeded():
-    # 100MB is 100 * 1024 * 1024 = 104,857,600 bytes. Let's make it 101MB.
-    oversized_content = b"x" * (101 * 1024 * 1024)
-    with pytest.raises(FileSizeExceededError):
-        DocumentExtractorService.extract_text("test.txt", oversized_content)
+    old_size = settings.MAX_FILE_SIZE_MB
+    settings.MAX_FILE_SIZE_MB = 0
+    try:
+        with pytest.raises(FileSizeExceededError):
+            DocumentExtractorService.extract_text("test.txt", b"x")
+    finally:
+        settings.MAX_FILE_SIZE_MB = old_size
+
 
 def test_unsupported_file_type():
     with pytest.raises(UnsupportedFileTypeError):

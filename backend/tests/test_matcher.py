@@ -6,23 +6,18 @@ from backend.app.services.matcher import (
     get_matching_slices,
     DualTierMatcher
 )
-from backend.app.services.segmenter import SentenceSegmenterService
 from backend.app.services.database import DatabaseService
 from backend.app.config import settings
 
-def test_database_and_faiss_initialization():
-    # Trigger loading references, which seeds database and FAISS if empty
+def test_database_and_elasticsearch_initialization():
+    # Trigger loading references, which seeds database and ES if empty
     references = load_references()
     assert len(references) > 0
-    
-    # Verify files exist on disk
-    assert settings.SQLITE_DB_PATH.exists()
-    assert settings.FAISS_INDEX_PATH.exists()
     
     # Verify records in database
     assert DatabaseService.get_sentence_count() == len(references)
     
-    # Retrieve sentence by faiss_id and verify it matches references
+    # Retrieve sentence by faiss_id (which is s.id primary key in Postgres) and verify it matches references
     for i in range(min(5, len(references))):
         ref_item = references[i]
         db_item = DatabaseService.get_sentence_by_faiss_id(ref_item["faiss_id"])
@@ -53,7 +48,7 @@ def test_lexical_matcher_exact_copy():
     # Take an exact sentence from the reference database
     ref_sentence = references[0]["text"]
     
-    # Exact copy should match with high similarity (close to 1.0)
+    # Exact copy should match with high similarity
     match = matcher.find_match(ref_sentence, threshold=0.7)
     assert match is not None
     assert match["text"] == ref_sentence
@@ -73,7 +68,7 @@ def test_semantic_matcher_paraphrase():
     # Heavily paraphrased version:
     paraphrased = "Global warming is one of the key challenges of our time, requiring immediate and strong systemic changes."
     
-    # Check that it doesn't match lexically (TF-IDF should be low due to different vocabulary)
+    # Check that it doesn't match lexically (threshold 0.7)
     lex_match = lex_matcher.find_match(paraphrased, threshold=0.7)
     assert lex_match is None
     
@@ -107,9 +102,9 @@ def test_get_matching_slices():
 
 def test_dual_tier_matcher_integration():
     # Setup query sentences with absolute offsets
-    # Sentence 1: Exact copy from ref_history_internet ("The World Wide Web was invented by Sir Tim Berners-Lee in 1989 while working at CERN...")
+    # Sentence 1: Exact copy from ref_history_internet
     # Sentence 2: Original/clean sentence
-    # Sentence 3: Paraphrased from ref_dna_genetics ("Gene editing technologies have advanced rapidly, driven by the discovery and development of the CRISPR-Cas9 system.")
+    # Sentence 3: Paraphrased from ref_dna_genetics
     text1 = "The World Wide Web was invented by Sir Tim Berners-Lee in 1989 while working at CERN as a distributed information sharing system."
     text2 = "In this paper, we present a novel approach to local file indexing."
     text3 = "Genomic edit methods have progressed very fast, powered by finding and creating the CRISPR-Cas9 mechanism."
@@ -126,32 +121,27 @@ def test_dual_tier_matcher_integration():
     report = matcher.analyze_document(sentences, lexical_threshold=0.7, semantic_threshold=0.55)
     
     assert report["total_sentences"] == 3
+    # Both text1 (lexical/hybrid) and text3 (semantic) should match
     assert report["plagiarized_sentences_count"] == 2
-    # overall plagiarism score = 2 / 3
     assert abs(report["plagiarism_score"] - 0.666) < 0.01
-    
-    # 1 lexical match, 1 semantic match
-    assert report["lexical_matches_count"] == 1
-    assert report["semantic_matches_count"] == 1
     
     matches = report["matches"]
     assert len(matches) == 2
     
     # Verify match detail structure
     m1 = matches[0]
-    assert m1["match_type"] == "lexical"
+    # In hybrid RRF, exact copies appear in both ES and pgvector top K, so it could be "hybrid" or "lexical" depending on rank
+    assert m1["match_type"] in ("lexical", "hybrid")
     assert m1["matched_sentence"]["doc_id"] == "ref_history_internet"
     assert len(m1["highlights"]) > 0
-    # The highlight coordinates must be within sentence bounds [0, len(text1)]
     for hl in m1["highlights"]:
         assert hl["start_char"] >= 0
         assert hl["end_char"] <= len(text1)
         
     m2 = matches[1]
-    assert m2["match_type"] == "semantic"
+    assert m2["match_type"] in ("semantic", "hybrid")
     assert m2["matched_sentence"]["doc_id"] == "ref_dna_genetics"
     assert len(m2["highlights"]) > 0
-    # Highlight coordinates must be within sentence 3 bounds
     for hl in m2["highlights"]:
         assert hl["start_char"] >= sentences[2]["start_char"]
         assert hl["end_char"] <= sentences[2]["end_char"]

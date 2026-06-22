@@ -52,12 +52,16 @@ def test_upload_unsupported_type(client):
     assert "not supported" in response.json()["detail"]
 
 def test_upload_oversized_file(client):
-    # Over max size (100MB)
-    huge_content = b"x" * (101 * 1024 * 1024)
-    files = {"file": ("huge_file.txt", huge_content, "text/plain")}
-    response = client.post(
-        f"{settings.API_V1_STR}/documents/upload",
-        files=files
-    )
-    assert response.status_code == 413
-    assert "exceeds the maximum limit" in response.json()["detail"]
+    old_size = settings.MAX_FILE_SIZE_MB
+    settings.MAX_FILE_SIZE_MB = 0
+    try:
+        files = {"file": ("huge_file.txt", b"x", "text/plain")}
+        response = client.post(
+            f"{settings.API_V1_STR}/documents/upload",
+            files=files
+        )
+        assert response.status_code == 413
+        assert "exceeds the maximum limit" in response.json()["detail"]
+    finally:
+        settings.MAX_FILE_SIZE_MB = old_size
+
