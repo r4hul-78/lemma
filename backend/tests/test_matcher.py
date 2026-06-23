@@ -1,13 +1,12 @@
-import pytest
-from backend.app.services.matcher import (
+from app.services.matcher import (
     load_references,
     LexicalMatcher,
     SemanticMatcher,
     get_matching_slices,
     DualTierMatcher
 )
-from backend.app.services.database import DatabaseService
-from backend.app.config import settings
+from app.services.database import DatabaseService
+from app.config import settings
 
 def test_database_and_elasticsearch_initialization():
     # Trigger loading references, which seeds database and ES if empty

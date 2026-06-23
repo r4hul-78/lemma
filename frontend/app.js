@@ -4,12 +4,25 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     // API URL configuration
-    const API_BASE_URL = 'https://r4hul-78-lemma-backend.hf.space'; //'http://localhost:8000'; 
-    const API_UPLOAD_URL = `${API_BASE_URL}/api/v1/documents/upload`;
-    const API_ANALYZE_URL = `${API_BASE_URL}/api/v1/analyze`;
-    const API_STATUS_URL = `${API_BASE_URL}/api/v1/status`;
-    const API_REWRITE_URL = `${API_BASE_URL}/api/v1/rewrite`;
-    const API_HEALTH_URL = `${API_BASE_URL}/api/v1/health`;
+    let API_BASE_URL = 'https://r4hul-78-lemma-backend.hf.space'; 
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        API_BASE_URL = 'http://localhost:8000';
+    }
+
+    let API_UPLOAD_URL = `${API_BASE_URL}/api/v1/documents/upload`;
+    let API_ANALYZE_URL = `${API_BASE_URL}/api/v1/analyze`;
+    let API_STATUS_URL = `${API_BASE_URL}/api/v1/status`;
+    let API_REWRITE_URL = `${API_BASE_URL}/api/v1/rewrite`;
+    let API_HEALTH_URL = `${API_BASE_URL}/api/v1/health`;
+
+    function updateApiUrls(base) {
+        API_BASE_URL = base;
+        API_UPLOAD_URL = `${API_BASE_URL}/api/v1/documents/upload`;
+        API_ANALYZE_URL = `${API_BASE_URL}/api/v1/analyze`;
+        API_STATUS_URL = `${API_BASE_URL}/api/v1/status`;
+        API_REWRITE_URL = `${API_BASE_URL}/api/v1/rewrite`;
+        API_HEALTH_URL = `${API_BASE_URL}/api/v1/health`;
+    }
 
     // DOM Elements
     const serverStatusDot = document.getElementById("server-status-dot");
@@ -52,6 +65,20 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentJobId = null;
 
     // Initialize Page
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        fetch('config.json')
+            .then(res => {
+                if (res.ok) return res.json();
+                throw new Error("Config file not found");
+            })
+            .then(data => {
+                if (data.BACKEND_API_URL) {
+                    updateApiUrls(data.BACKEND_API_URL);
+                    checkServerHealth();
+                }
+            })
+            .catch(err => console.warn("Failed to load production config.json, using default URL:", err));
+    }
     checkServerHealth();
     setInterval(checkServerHealth, 10000); // Check health every 10 seconds
 

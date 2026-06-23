@@ -1,7 +1,7 @@
 import logging
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
-from backend.app.config import settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 

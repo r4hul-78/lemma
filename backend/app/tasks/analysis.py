@@ -2,11 +2,11 @@ import os
 import logging
 import asyncio
 import threading
-from backend.app.config import settings
-from backend.app.tasks.celery_app import celery_app
-from backend.app.services.extractor import DocumentExtractorService
-from backend.app.services.segmenter import SentenceSegmenterService
-from backend.app.services.matcher import DualTierMatcher
+from app.config import settings
+from app.tasks.celery_app import celery_app
+from app.services.extractor import DocumentExtractorService
+from app.services.segmenter import SentenceSegmenterService
+from app.services.matcher import DualTierMatcher
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def run_async_in_thread(coro):
         raise err
     return res
 
-@celery_app.task(bind=True, name="backend.app.tasks.analysis.analyze_document_task")
+@celery_app.task(bind=True, name="app.tasks.analysis.analyze_document_task")
 def analyze_document_task(self, file_path: str, original_filename: str) -> dict:
     """
     Background Celery task to parse a document, fetch web references, and perform plagiarism analysis.
@@ -65,7 +65,7 @@ def analyze_document_task(self, file_path: str, original_filename: str) -> dict:
         # 1. Ephemeral online candidate retrieval & caching
         if settings.ENABLE_ONLINE_RETRIEVAL:
             try:
-                from backend.app.services.online_retriever import OnlineRetrieverService
+                from app.services.online_retriever import OnlineRetrieverService
                 logger.info(f"Triggering online retrieval query generation for job: {job_id}")
                 queries = OnlineRetrieverService.extract_search_queries(text)
                 
@@ -107,7 +107,7 @@ def analyze_document_task(self, file_path: str, original_filename: str) -> dict:
         # 4. Prune ephemeral database & Elasticsearch candidate records
         if settings.ENABLE_ONLINE_RETRIEVAL:
             try:
-                from backend.app.services.online_retriever import OnlineRetrieverService
+                from app.services.online_retriever import OnlineRetrieverService
                 OnlineRetrieverService.prune_cache(job_id)
             except Exception as e:
                 logger.error(f"Failed to prune cache for job {job_id}: {e}")

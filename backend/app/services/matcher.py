@@ -6,10 +6,10 @@ import psycopg2.extras
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
 
-from backend.app.config import settings
-from backend.app.services.segmenter import SentenceSegmenterService
-from backend.app.services.database import DatabaseService
-from backend.app.services.elasticsearch_client import (
+from app.config import settings
+from app.services.segmenter import SentenceSegmenterService
+from app.services.database import DatabaseService
+from app.services.elasticsearch_client import (
     initialize_es,
     index_sentence_bulk,
     search_sentences_bm25

@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     HYBRID_THRESHOLD: float = 0.60
     
     # Database Settings
+    DATABASE_URL: str | None = None
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "lemma"
@@ -94,5 +95,22 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # Ensure uploads and data directories exist
-settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-settings.FAISS_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+try:
+    settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+except Exception as e:
+    import tempfile
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.warning(f"Could not create UPLOAD_DIR at {settings.UPLOAD_DIR}: {e}. Falling back to system temp directory.")
+    settings.UPLOAD_DIR = Path(tempfile.gettempdir()) / "lemma_uploads"
+    settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+try:
+    settings.FAISS_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+except Exception as e:
+    import tempfile
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(f"Could not create FAISS parent directory at {settings.FAISS_INDEX_PATH.parent}: {e}. Falling back to system temp directory.")
+    settings.FAISS_INDEX_PATH = Path(tempfile.gettempdir()) / "lemma_vectors.index"

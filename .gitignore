@@ -30,6 +30,15 @@ backend/app/uploads/
 lemma/Project Context/
 Project Context
 
+# Hugging Face files for Backend config
+lemma/Hugging Face/
+Hugging Face
+
+# Local LLM Cache (Ollama & LM Studio)
+.ollama/
+.lmstudio/
+
+
 # IDEs and Editors
 .vscode/
 .idea/

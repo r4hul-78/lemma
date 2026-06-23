@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from backend.app.services.online_retriever import OnlineRetrieverService
-from backend.app.services.database import DatabaseService
-from backend.app.services.elasticsearch_client import get_es_client
+from app.services.online_retriever import OnlineRetrieverService
+from app.services.database import DatabaseService
+from app.services.elasticsearch_client import get_es_client
 
 # Mock arXiv XML response
 MOCK_ARXIV_XML = """<?xml version="1.0" encoding="utf-8"?>

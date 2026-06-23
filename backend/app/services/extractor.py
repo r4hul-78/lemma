@@ -2,7 +2,7 @@ import io
 from pathlib import Path
 from pypdf import PdfReader
 from docx import Document
-from backend.app.config import settings
+from app.config import settings
 
 class ExtractionError(Exception):
     """Base exception for document extraction errors."""

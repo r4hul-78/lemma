@@ -1,7 +1,7 @@
 import io
 import pytest
 from fastapi.testclient import TestClient
-from backend.app.services.pdf_generator import PDFGeneratorService
+from app.services.pdf_generator import PDFGeneratorService
 
 def test_pdf_generator_service_compiles():
     # Setup dummy completed analysis result payload

@@ -59,6 +59,7 @@ echo          You can view API swagger docs at: http://localhost:8000/docs
 echo =======================================================================
 echo.
 
-python -m uvicorn backend.app.main:app --reload --port 8000
+set PYTHONPATH=backend
+python -m uvicorn app.main:app --reload --port 8000
 
 pause

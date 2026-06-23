@@ -5,8 +5,8 @@ import logging
 # Ensure backend folder is in Python path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from backend.app.services.database import DatabaseService
-from backend.app.services.elasticsearch_client import initialize_es, index_sentence_bulk
+from app.services.database import DatabaseService
+from app.services.elasticsearch_client import initialize_es, index_sentence_bulk
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("backfill_migration")
@@ -15,7 +15,7 @@ def backfill():
     logger.info("Starting Elasticsearch backfill migration...")
     
     # Automatically seed database if empty
-    from backend.app.services.matcher import seed_database
+    from app.services.matcher import seed_database
     seed_database()
     
     # 1. Initialize Elasticsearch Index

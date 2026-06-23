@@ -2,7 +2,7 @@ import asyncio
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi.testclient import TestClient
-from backend.app.services.llm import LLMService
+from app.services.llm import LLMService
 
 def test_llm_service_get_available_models():
     mock_response = MagicMock()

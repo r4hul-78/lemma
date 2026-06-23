@@ -1,6 +1,7 @@
+import os
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
-from backend.app.config import settings
+from app.config import settings
 
 class DatabaseService:
     """Manages PostgreSQL database connections, table creation, and metadata queries."""
@@ -8,6 +9,12 @@ class DatabaseService:
     @staticmethod
     def get_connection():
         """Returns a connection to the PostgreSQL database."""
+        db_url = os.environ.get("DATABASE_URL") or settings.DATABASE_URL
+        if db_url:
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql://", 1)
+            return psycopg2.connect(db_url)
+            
         conn = psycopg2.connect(
             host=settings.POSTGRES_HOST,
             port=settings.POSTGRES_PORT,

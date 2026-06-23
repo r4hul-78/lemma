@@ -1,5 +1,5 @@
 import spacy
-from backend.app.config import settings
+from app.config import settings
 
 class SentenceSegmenterService:
     _nlp = None

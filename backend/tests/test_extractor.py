@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from backend.app.config import settings
-from backend.app.services.extractor import (
+from app.config import settings
+from app.services.extractor import (
     DocumentExtractorService,
     FileSizeExceededError,
     UnsupportedFileTypeError,
@@ -25,7 +25,7 @@ def test_extract_docx(create_docx_bytes):
     assert "First paragraph of docx." in result
     assert "Second paragraph of docx." in result
 
-@patch("backend.app.services.extractor.PdfReader")
+@patch("app.services.extractor.PdfReader")
 def test_extract_pdf_success(mock_pdf_reader_class):
     # Setup mock reader and pages
     mock_reader = MagicMock()
@@ -46,7 +46,7 @@ def test_extract_pdf_success(mock_pdf_reader_class):
     assert "Text on page 2." in result
     mock_pdf_reader_class.assert_called_once()
 
-@patch("backend.app.services.extractor.PdfReader")
+@patch("app.services.extractor.PdfReader")
 def test_extract_pdf_encrypted_fails(mock_pdf_reader_class):
     mock_reader = MagicMock()
     mock_reader.is_encrypted = True

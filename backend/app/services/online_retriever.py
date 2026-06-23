@@ -3,11 +3,11 @@ import asyncio
 import httpx
 import xml.etree.ElementTree as ET
 from collections import Counter
-from backend.app.config import settings
-from backend.app.services.segmenter import SentenceSegmenterService
-from backend.app.services.database import DatabaseService
-from backend.app.services.elasticsearch_client import get_es_client, index_sentence_bulk
-from backend.app.services.matcher import SemanticMatcher
+from app.config import settings
+from app.services.segmenter import SentenceSegmenterService
+from app.services.database import DatabaseService
+from app.services.elasticsearch_client import get_es_client, index_sentence_bulk
+from app.services.matcher import SemanticMatcher
 
 logger = logging.getLogger(__name__)
 

@@ -4,19 +4,19 @@ from pathlib import Path
 from docx import Document
 
 # Override settings to use a test database and index BEFORE importing app or other components
-from backend.app.config import settings
+from app.config import settings
 settings.POSTGRES_DB = "test_lemma"
 settings.CELERY_ALWAYS_EAGER = True
 settings.ENABLE_ONLINE_RETRIEVAL = False
 
 from fastapi.testclient import TestClient
-from backend.app.main import app
+from app.main import app
 
 @pytest.fixture(scope="session", autouse=True)
 def clean_test_db_and_index():
     """Ensures test database tables and ES index are initialized and cleaned up."""
-    from backend.app.services.database import DatabaseService
-    from backend.app.services.elasticsearch_client import get_es_client, initialize_es
+    from app.services.database import DatabaseService
+    from app.services.elasticsearch_client import get_es_client, initialize_es
     
     # Initialize DB (creates extension, tables, HNSW index)
     try:

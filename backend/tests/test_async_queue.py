@@ -1,7 +1,7 @@
 import io
 import pytest
 from fastapi.testclient import TestClient
-from backend.app.config import settings
+from app.config import settings
 
 def test_async_analyze_flow_txt(client: TestClient):
     # Prepare dummy txt content

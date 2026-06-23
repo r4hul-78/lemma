@@ -1,5 +1,5 @@
 import pytest
-from backend.app.services.segmenter import SentenceSegmenterService
+from app.services.segmenter import SentenceSegmenterService
 
 def test_segmenter_empty():
     assert SentenceSegmenterService.segment("") == []

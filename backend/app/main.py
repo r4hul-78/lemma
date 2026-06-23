@@ -8,21 +8,21 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
-from backend.app.config import settings
-from backend.app.services.pdf_generator import PDFGeneratorService
-from backend.app.schemas.document import DocumentUploadResponse, SentenceCoordinate
-from backend.app.schemas.rewrite import RewriteRequest, RewriteResponse
-from backend.app.services.extractor import (
+from app.config import settings
+from app.services.pdf_generator import PDFGeneratorService
+from app.schemas.document import DocumentUploadResponse, SentenceCoordinate
+from app.schemas.rewrite import RewriteRequest, RewriteResponse
+from app.services.extractor import (
     DocumentExtractorService,
     FileSizeExceededError,
     UnsupportedFileTypeError,
     ExtractionError,
 )
-from backend.app.services.segmenter import SentenceSegmenterService
-from backend.app.services.matcher import DualTierMatcher
-from backend.app.services.llm import LLMService
-from backend.app.tasks.celery_app import celery_app
-from backend.app.tasks.analysis import analyze_document_task
+from app.services.segmenter import SentenceSegmenterService
+from app.services.matcher import DualTierMatcher
+from app.services.llm import LLMService
+from app.tasks.celery_app import celery_app
+from app.tasks.analysis import analyze_document_task
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -136,7 +136,7 @@ async def upload_document(file: UploadFile = File(...)):
     try:
         if settings.ENABLE_ONLINE_RETRIEVAL:
             try:
-                from backend.app.services.online_retriever import OnlineRetrieverService
+                from app.services.online_retriever import OnlineRetrieverService
                 queries = OnlineRetrieverService.extract_search_queries(text)
                 candidates = await OnlineRetrieverService.get_online_candidates(queries)
                 await OnlineRetrieverService.seed_ephemeral_candidates(job_id, candidates)
@@ -158,7 +158,7 @@ async def upload_document(file: UploadFile = File(...)):
     finally:
         if settings.ENABLE_ONLINE_RETRIEVAL:
             try:
-                from backend.app.services.online_retriever import OnlineRetrieverService
+                from app.services.online_retriever import OnlineRetrieverService
                 OnlineRetrieverService.prune_cache(job_id)
             except Exception as e:
                 import logging
@@ -347,6 +347,11 @@ async def rewrite_text_endpoint(payload: RewriteRequest):
 # Serve static frontend files
 FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
 # Ensure the directory exists
-FRONTEND_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+try:
+    FRONTEND_DIR.mkdir(parents=True, exist_ok=True)
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+except Exception as e:
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(f"Could not mount static frontend files directory {FRONTEND_DIR}: {e}")
 

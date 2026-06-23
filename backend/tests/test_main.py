@@ -1,5 +1,5 @@
 import pytest
-from backend.app.config import settings
+from app.config import settings
 
 def test_root_endpoint(client):
     response = client.get("/")

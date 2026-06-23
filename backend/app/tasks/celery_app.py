@@ -1,5 +1,5 @@
 from celery import Celery
-from backend.app.config import settings
+from app.config import settings
 
 # In-memory broker and backend for testing/eager tasks to avoid Redis connection errors
 if settings.CELERY_ALWAYS_EAGER:
@@ -13,7 +13,7 @@ celery_app = Celery(
     "lemma_tasks",
     broker=broker_url,
     backend=result_backend,
-    include=["backend.app.tasks.analysis"]
+    include=["app.tasks.analysis"]
 )
 
 celery_app.conf.update(
