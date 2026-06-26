@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let width, height;
     let sphereRadius = 160;
     let particles = [];
-    const particleCount = 520;
+    let particleCount = 520;
     const goldenRatio = (1 + Math.sqrt(5)) / 2;
 
     // Rotation variables (idle velocities)
@@ -83,13 +83,22 @@ document.addEventListener("DOMContentLoaded", () => {
         width = canvas.width = clientWidth;
         height = canvas.height = clientHeight;
 
-        // Scale sphere size based on screen width
+        // Scale sphere size and particle load based on screen width
+        let targetCount = 520;
         if (width < 600) {
             sphereRadius = 100;
+            targetCount = 150; // Performance optimization for low-end mobile engines
         } else if (width < 1000) {
             sphereRadius = 130;
+            targetCount = 300;
         } else {
             sphereRadius = 160;
+            targetCount = 520;
+        }
+
+        if (targetCount !== particleCount || particles.length === 0) {
+            particleCount = targetCount;
+            initParticles();
         }
     }
     window.addEventListener("resize", resizeCanvas);
@@ -122,7 +131,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     // Perform initial scaling & coordinate creation
     resizeCanvas();
-    initParticles();
 
 
     // Mouse movement interaction listeners

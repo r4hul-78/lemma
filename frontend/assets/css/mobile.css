@@ -1,0 +1,261 @@
+/* -------------------------------------------------------------
+ * Lemma Mobile-Specific Styles (mobile.css)
+ * ------------------------------------------------------------- */
+
+/* Safe Area Inset Management for Notch Devices */
+body {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Mobile Base Styling Overrides */
+@media (max-width: 767px) {
+    /* 1. App Shell Flex/Grid Adjustments */
+    .app-container {
+        flex-direction: column; /* Move sidebar/nav to bottom */
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    /* 2. Sidebar Navigation transformed to Bottom Navigation Bar */
+    .sidebar {
+        width: 100vw;
+        height: 64px;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        flex-direction: row;
+        padding: 0;
+        border-right: none;
+        border-top: 1px solid var(--border-color);
+        z-index: 1000;
+        background-color: rgba(10, 10, 12, 0.95);
+        backdrop-filter: blur(20px);
+        justify-content: space-around;
+        align-items: center;
+    }
+
+    .sidebar-brand, .sidebar-footer {
+        display: none !important; /* Hide logo and offline indicator from bottom bar */
+    }
+
+    .sidebar-nav {
+        width: 100%;
+        margin-top: 0;
+    }
+
+    .sidebar-nav ul {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        width: 100%;
+    }
+
+    .nav-item {
+        margin-bottom: 0;
+        flex: 1;
+        text-align: center;
+    }
+
+    .nav-item a {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 8px 0;
+        font-size: 0.7rem;
+        border-radius: 0;
+        background: none !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    .nav-item a i {
+        font-size: 1.25rem;
+        width: auto;
+    }
+
+    .nav-item.active a {
+        color: var(--accent-purple);
+    }
+
+    /* 3. Main Workspace Layout Adjustments */
+    .main-content {
+        padding: 1rem;
+        padding-bottom: 80px; /* Safe padding for bottom navigation */
+        height: calc(100vh - 64px);
+        overflow-y: auto;
+    }
+
+    .main-header {
+        margin-bottom: 1rem;
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .header-welcome h2 {
+        font-size: 1.25rem;
+    }
+
+    .header-welcome p {
+        font-size: 0.8rem;
+        display: none; /* Hide subtitle on mobile to save vertical space */
+    }
+
+    /* 4. Grid Modernization (Transforming multi-column views to stacked views) */
+    .content-grid {
+        grid-template-columns: 1fr !important; /* Force single column on mobile */
+        gap: 1rem;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .left-panel {
+        min-height: auto;
+        padding: 1rem;
+    }
+
+    .right-panel {
+        gap: 1rem;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* 5. Mobile Tab Switcher Container (Managed via mobile-ui.js) */
+    .mobile-tab-view {
+        display: none !important; /* Managed by JS toggle */
+    }
+    
+    .mobile-tab-view.active-tab {
+        display: flex !important;
+        flex-direction: column;
+        animation: fadeIn 0.2s ease-in-out;
+    }
+
+    /* 6. Form Legibility & Zoom Prevention */
+    input, select, textarea {
+        font-size: 16px !important; /* Prevents auto-zoom on iOS Safari/Android Webview */
+    }
+
+    /* 7. Touch Target Optimizations */
+    .btn, button, select, input, .nav-item a {
+        min-height: 48px; /* Safe interactive target size */
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .viewer-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .viewer-title-area {
+        max-width: 100%;
+    }
+    
+    .viewer-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+
+    .viewer-actions .btn {
+        width: 100%;
+    }
+    
+    .viewer-scroller {
+        max-height: 380px; /* Limit scroller height on smaller viewports */
+    }
+
+    .progress-container {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem;
+    }
+
+    .progress-legend {
+        grid-template-columns: 1fr 1fr;
+        width: 100%;
+    }
+
+    /* Bottom Navigation Bar for Workspaces */
+    .mobile-tab-bar {
+        display: flex;
+        position: fixed;
+        bottom: 64px; /* Stacked above main navigation */
+        left: 0;
+        width: 100vw;
+        height: 48px;
+        background-color: var(--bg-tertiary);
+        border-top: 1px solid var(--border-color);
+        border-bottom: 1px solid var(--border-color);
+        z-index: 999;
+    }
+
+    .mobile-tab-btn {
+        flex: 1;
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition-fast);
+    }
+
+    .mobile-tab-btn i {
+        font-size: 0.95rem;
+    }
+
+    .mobile-tab-btn.active {
+        color: var(--text-primary);
+        border-bottom: 2px solid var(--accent-purple);
+        background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Shift content down or add padding to main-content so tab headers don't overlap layout */
+    .main-content {
+        padding-top: 1rem;
+        padding-bottom: 120px; /* Space for both tab-bar and sidebar bottom-nav */
+    }
+
+    /* UI Fixes for card scaling */
+    .panel {
+        padding: 1rem;
+    }
+    
+    .circular-progress {
+        width: 100px;
+        height: 100px;
+    }
+    
+    .circular-progress::before {
+        width: 78px;
+        height: 78px;
+    }
+    
+    .value-container {
+        font-size: 1.35rem;
+    }
+
+    .checklist {
+        text-align: left;
+        width: 100%;
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}

@@ -4,11 +4,7 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     // API URL configuration
-    let API_BASE_URL = 'https://r4hul-78-lemma-backend.hf.space'; 
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        API_BASE_URL = 'http://localhost:8000';
-    }
-
+    let API_BASE_URL = 'https://r4hul-78-lemma-backend.hf.space'; // 'http://localhost:8000'; 
     let API_UPLOAD_URL = `${API_BASE_URL}/api/v1/documents/upload`;
     let API_ANALYZE_URL = `${API_BASE_URL}/api/v1/analyze`;
     let API_STATUS_URL = `${API_BASE_URL}/api/v1/status`;
@@ -65,22 +61,20 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentJobId = null;
 
     // Initialize Page
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        fetch('config.json')
-            .then(res => {
-                if (res.ok) return res.json();
-                throw new Error("Config file not found");
-            })
-            .then(data => {
-                if (data.BACKEND_API_URL) {
-                    updateApiUrls(data.BACKEND_API_URL);
-                    checkServerHealth();
-                }
-            })
-            .catch(err => console.warn("Failed to load production config.json, using default URL:", err));
+    async function initApiConfig() {
+        try {
+            const resolvedUrl = await APIConfigManager.getApiBaseUrl();
+            updateApiUrls(resolvedUrl);
+            console.log("Resolved API URL:", resolvedUrl);
+        } catch (err) {
+            console.warn("Failed resolving API from config manager, fallback to default URL:", err);
+        } finally {
+            checkServerHealth();
+            setInterval(checkServerHealth, 10000); // Check health every 10 seconds
+        }
     }
-    checkServerHealth();
-    setInterval(checkServerHealth, 10000); // Check health every 10 seconds
+    
+    initApiConfig();
 
     /* -------------------------------------------------------------
      * Server Health Checking
@@ -176,6 +170,28 @@ document.addEventListener("DOMContentLoaded", () => {
     /* -------------------------------------------------------------
      * Document Upload Service Call (Async Queue Flow)
      * ------------------------------------------------------------- */
+    function resetMetricsUI() {
+        const lexicalChk = document.getElementById("chk-lexical");
+        const semanticChk = document.getElementById("chk-semantic");
+        const progressScore = document.getElementById("plagiarism-score-text");
+        const progressCircle = document.querySelector(".circular-progress");
+
+        if (progressScore) progressScore.textContent = "0%";
+        if (progressCircle) {
+            progressCircle.style.background = `conic-gradient(var(--border-color) 360deg, transparent 0deg)`;
+        }
+        
+        document.getElementById("legend-val-lexical").textContent = "0%";
+        document.getElementById("legend-val-hybrid").textContent = "0%";
+        document.getElementById("legend-val-semantic").textContent = "0%";
+        document.getElementById("legend-val-original").textContent = "100%";
+
+        lexicalChk.innerHTML = '<i class="fa-regular fa-circle"></i> Lexical Matching (TF-IDF)';
+        lexicalChk.className = "checklist-item";
+        semanticChk.innerHTML = '<i class="fa-regular fa-circle"></i> Semantic Indexing (Embeddings)';
+        semanticChk.className = "checklist-item";
+    }
+
     async function uploadDocument(file) {
         // Update Metadata sidebar indicators
         metaFilename.textContent = file.name;
@@ -183,6 +199,63 @@ document.addEventListener("DOMContentLoaded", () => {
         
         // Show loading progress
         showToast(`Uploading ${file.name}...`, "info");
+        
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            const response = await fetch(API_UPLOAD_URL, {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || "Failed to upload document");
+            }
+
+            uploadResponseData = data;
+            showToast("Document uploaded and segmented successfully.", "success");
+            
+            // Render Document Viewer (plain text)
+            renderDocument(uploadResponseData);
+            
+            // Reset metrics cards in UI
+            resetMetricsUI();
+
+            // Enable Run Analysis button
+            btnRunAnalysis.disabled = false;
+            btnDownloadPdf.classList.add("hidden");
+            metaStatus.innerHTML = '<span class="badge badge-dim">Uploaded</span>';
+            
+        } catch (error) {
+            console.error("Upload Error:", error);
+            showToast(error.message, "error");
+            
+            // Reset metadata card on failure
+            metaFilename.textContent = "No file uploaded";
+            metaStatus.innerHTML = '<span class="badge badge-dim">Idle</span>';
+            btnRunAnalysis.disabled = true;
+        }
+    }
+
+    async function triggerPlagiarismAnalysis(file) {
+        if (!file) {
+            showToast("No active file to analyze.", "error");
+            return;
+        }
+
+        const lexicalChk = document.getElementById("chk-lexical");
+        const semanticChk = document.getElementById("chk-semantic");
+
+        btnRunAnalysis.disabled = true;
+        showToast("Submitting document to plagiarism checker...", "info");
+
+        // Set visual loading indicators
+        metaStatus.innerHTML = '<span class="badge badge-dim">Queued...</span>';
+        lexicalChk.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking Lexical Database...';
+        lexicalChk.className = "checklist-item done";
         
         const formData = new FormData();
         formData.append("file", file);
@@ -196,29 +269,30 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.detail || "Failed to initiate analysis");
+                throw new Error(data.detail || "Failed to submit analysis job");
             }
 
             const jobId = data.job_id;
             currentJobId = jobId;
-            btnDownloadPdf.classList.add("hidden");
-            metaStatus.innerHTML = '<span class="badge badge-dim">Queued...</span>';
-            showToast("Analysis job queued on worker.", "info");
             
-            // Start polling status
-            pollJobStatus(jobId, file.name);
-            
+            // Start polling the job status
+            pollAnalysisStatus(jobId, file.name);
+
         } catch (error) {
-            console.error("Upload/Queue Error:", error);
+            console.error("Analysis Submission Error:", error);
             showToast(error.message, "error");
-            
-            // Reset metadata card on failure
-            metaFilename.textContent = "No file uploaded";
-            metaStatus.innerHTML = '<span class="badge badge-dim">Idle</span>';
+            metaStatus.innerHTML = '<span class="badge badge-dim">Failed</span>';
+            btnRunAnalysis.disabled = false;
+            resetMetricsUI();
         }
     }
 
-    async function pollJobStatus(jobId, filename) {
+    async function pollAnalysisStatus(jobId, filename) {
+        const lexicalChk = document.getElementById("chk-lexical");
+        const semanticChk = document.getElementById("chk-semantic");
+        const progressScore = document.getElementById("plagiarism-score-text");
+        const progressCircle = document.querySelector(".circular-progress");
+
         const interval = setInterval(async () => {
             try {
                 const response = await fetch(`${API_STATUS_URL}/${jobId}`);
@@ -231,19 +305,70 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (data.status === "completed") {
                     clearInterval(interval);
                     uploadResponseData = data.result;
+                    
                     showToast("Document analysis complete!", "success");
+                    metaStatus.innerHTML = '<span class="badge badge-dim">Analyzed</span>';
+
+                    // Update checklist
+                    lexicalChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Lexical Match Complete';
+                    semanticChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Semantic Matching Complete';
+                    semanticChk.className = "checklist-item done";
+
+                    // Calculate real percentages
+                    const analysis = uploadResponseData.analysis;
+                    const total = analysis.total_sentences;
+                    const lexicalCount = analysis.lexical_matches_count;
+                    const hybridCount = analysis.hybrid_matches_count || 0;
+                    const semanticCount = analysis.semantic_matches_count;
+
+                    const pctL = total > 0 ? Math.round((lexicalCount / total) * 100) : 0;
+                    const pctH = total > 0 ? Math.round((hybridCount / total) * 100) : 0;
+                    const pctS = total > 0 ? Math.round((semanticCount / total) * 100) : 0;
+                    const pctO = Math.max(0, 100 - pctL - pctH - pctS);
+
+                    // Set circular progress middle text
+                    const realPlagScore = pctL + pctH + pctS;
+                    progressScore.textContent = `${realPlagScore}%`;
                     
-                    // Render Document Viewer
-                    renderDocument(uploadResponseData);
+                    // Set conic gradient
+                    const degL = pctL * 3.6;
+                    const degH = pctH * 3.6;
+                    const degS = pctS * 3.6;
+                    progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #f59e0b ${degL}deg ${degL + degH}deg, #8b5cf6 ${degL + degH}deg ${degL + degH + degS}deg, #10b981 ${degL + degH + degS}deg 360deg)`;
                     
-                    // Enable analysis button trigger
+                    // Update Legend Values
+                    document.getElementById("legend-val-lexical").textContent = `${pctL}%`;
+                    document.getElementById("legend-val-hybrid").textContent = `${pctH}%`;
+                    document.getElementById("legend-val-semantic").textContent = `${pctS}%`;
+                    document.getElementById("legend-val-original").textContent = `${pctO}%`;
+
+                    // Apply visual highlights to document sentences
+                    applyPlagiarismHighlights(analysis);
+                    
+                    // Show Download PDF button
+                    btnDownloadPdf.classList.remove("hidden");
+
+                    // Save report to history
+                    saveReportToHistory(uploadResponseData.filename, jobId, realPlagScore, uploadResponseData);
+
+                    // Enable button
                     btnRunAnalysis.disabled = false;
-                    metaStatus.innerHTML = '<span class="badge badge-dim">Ready</span>';
+
+                    // Final success toast
+                    if (realPlagScore > 0) {
+                        showToast(`Analysis complete. Found ${realPlagScore}% plagiarism match profile.`, "success");
+                    } else {
+                        showToast("Analysis complete. Document is 100% original and clean!", "success");
+                    }
+
                 } else if (data.status === "failed") {
                     clearInterval(interval);
                     throw new Error(data.error || "Analysis task failed");
                 } else if (data.status === "processing") {
                     metaStatus.innerHTML = '<span class="badge badge-dim">Analyzing...</span>';
+                    lexicalChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Lexical Match Complete';
+                    semanticChk.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Indexing Semantic Vectors...';
+                    semanticChk.className = "checklist-item done";
                 } else {
                     metaStatus.innerHTML = '<span class="badge badge-dim">Queued...</span>';
                 }
@@ -252,8 +377,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.error("Polling Error:", error);
                 showToast(error.message, "error");
                 
-                metaFilename.textContent = "No file uploaded";
                 metaStatus.innerHTML = '<span class="badge badge-dim">Failed</span>';
+                btnRunAnalysis.disabled = false;
+                resetMetricsUI();
             }
         }, 1000);
     }
@@ -563,80 +689,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Trigger analysis toast (Phase 2 Integration)
+    // Trigger analysis (Phase 2 Integration)
     btnRunAnalysis.addEventListener("click", () => {
-        if (!uploadResponseData || !uploadResponseData.analysis) {
-            showToast("No analysis report found for this document.", "error");
+        if (!activeFile) {
+            showToast("Please upload a file first.", "error");
             return;
         }
-
-        const analysis = uploadResponseData.analysis;
-        showToast("Phase 2 Matcher Engine running (Lexical & Semantic)...", "info");
-        
-        const lexicalChk = document.getElementById("chk-lexical");
-        const semanticChk = document.getElementById("chk-semantic");
-        const progressScore = document.getElementById("plagiarism-score-text");
-        const progressCircle = document.querySelector(".circular-progress");
-
-        lexicalChk.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking Lexical Database...';
-        lexicalChk.className = "checklist-item done";
-
-        setTimeout(() => {
-            lexicalChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Lexical Match Complete';
-            semanticChk.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Indexing Semantic Vectors...';
-            semanticChk.className = "checklist-item done";
-            
-            // Calculate real percentages
-            const total = analysis.total_sentences;
-            const lexicalCount = analysis.lexical_matches_count;
-            const hybridCount = analysis.hybrid_matches_count || 0;
-            const semanticCount = analysis.semantic_matches_count;
-
-            const pctL = total > 0 ? Math.round((lexicalCount / total) * 100) : 0;
-            const pctH = total > 0 ? Math.round((hybridCount / total) * 100) : 0;
-            const pctS = total > 0 ? Math.round((semanticCount / total) * 100) : 0;
-            const pctO = Math.max(0, 100 - pctL - pctH - pctS);
-
-            setTimeout(() => {
-                semanticChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Semantic Matching Complete';
-                
-                // Set circular progress middle text (overall plagiarism score)
-                const realPlagScore = pctL + pctH + pctS;
-                progressScore.textContent = `${realPlagScore}%`;
-                
-                // Calculate conic gradient slices:
-                // Red (Lexical): 0 to pctL%
-                // Orange (Hybrid): pctL% to (pctL + pctH)%
-                // Purple (Semantic): (pctL + pctH)% to (pctL + pctH + pctS)%
-                // Green (Original): (pctL + pctH + pctS)% to 100%
-                const degL = pctL * 3.6;
-                const degH = pctH * 3.6;
-                const degS = pctS * 3.6;
-                
-                progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #f59e0b ${degL}deg ${degL + degH}deg, #8b5cf6 ${degL + degH}deg ${degL + degH + degS}deg, #10b981 ${degL + degH + degS}deg 360deg)`;
-                
-                // Update Legend Values
-                document.getElementById("legend-val-lexical").textContent = `${pctL}%`;
-                document.getElementById("legend-val-hybrid").textContent = `${pctH}%`;
-                document.getElementById("legend-val-semantic").textContent = `${pctS}%`;
-                document.getElementById("legend-val-original").textContent = `${pctO}%`;
-
-                // Apply visual highlights to document sentences
-                applyPlagiarismHighlights(analysis);
-                
-                // Show Download PDF button
-                btnDownloadPdf.classList.remove("hidden");
-
-                // Save report to history
-                saveReportToHistory(uploadResponseData.filename, currentJobId, realPlagScore, uploadResponseData);
-
-                // Final success toast
-                if (realPlagScore > 0) {
-                    showToast(`Analysis complete. Found ${realPlagScore}% plagiarism match profile.`, "success");
-                } else {
-                    showToast("Analysis complete. Document is 100% original and clean!", "success");
-                }
-            }, 1200);
-        }, 1200);
+        triggerPlagiarismAnalysis(activeFile);
     });
 
     // Download PDF Report
