@@ -11,7 +11,11 @@ def get_es_client() -> Elasticsearch:
     """Returns the Elasticsearch client singleton instance."""
     global _es_client
     if _es_client is None:
-        _es_client = Elasticsearch(settings.ELASTICSEARCH_URL)
+        headers = {
+            "Accept": "application/vnd.elasticsearch+json; compatible-with=8",
+            "Content-Type": "application/vnd.elasticsearch+json; compatible-with=8"
+        }
+        _es_client = Elasticsearch(settings.ELASTICSEARCH_URL, headers=headers)
     return _es_client
 
 def initialize_es() -> None:

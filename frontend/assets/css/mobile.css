@@ -14,136 +14,188 @@ body {
 @media (max-width: 767px) {
     /* 1. App Shell Flex/Grid Adjustments */
     .app-container {
-        flex-direction: column; /* Move sidebar/nav to bottom */
+        flex-direction: column;`
         height: 100vh;
         overflow: hidden;
     }
 
-    /* 2. Sidebar Navigation transformed to Bottom Navigation Bar */
+    /* 2. Sidebar Navigation transformed to a Slide-out Drawer */
     .sidebar {
-        width: 100vw;
-        height: 64px;
+        width: 280px;
+        height: 100vh;
         position: fixed;
-        bottom: 0;
-        left: 0;
-        flex-direction: row;
-        padding: 0;
-        border-right: none;
-        border-top: 1px solid var(--border-color);
+        top: 0;
+        left: -280px; /* Hidden offscreen by default */
+        border-right: 1px solid var(--border-color);
+        border-top: none;
         z-index: 1000;
-        background-color: rgba(10, 10, 12, 0.95);
-        backdrop-filter: blur(20px);
-        justify-content: space-around;
-        align-items: center;
-    }
-
-    .sidebar-brand, .sidebar-footer {
-        display: none !important; /* Hide logo and offline indicator from bottom bar */
-    }
-
-    .sidebar-nav {
-        width: 100%;
-        margin-top: 0;
-    }
-
-    .sidebar-nav ul {
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        width: 100%;
-    }
-
-    .nav-item {
-        margin-bottom: 0;
-        flex: 1;
-        text-align: center;
-    }
-
-    .nav-item a {
+        background-color: var(--bg-secondary);
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.7);
+        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         display: flex;
         flex-direction: column;
-        gap: 4px;
-        padding: 8px 0;
-        font-size: 0.7rem;
-        border-radius: 0;
-        background: none !important;
-        border: none !important;
-        box-shadow: none !important;
+        padding: 1.5rem 1.25rem;
     }
 
-    .nav-item a i {
-        font-size: 1.25rem;
-        width: auto;
+    .sidebar.open {
+        left: 0; /* Slide-in */
     }
 
-    .nav-item.active a {
-        color: var(--accent-purple);
+    .sidebar-brand {
+        display: flex !important;
+        margin-bottom: 2rem;
+    }
+
+    .sidebar-footer {
+        display: flex !important;
+        margin-top: auto;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    /* Sidebar Drawer Backdrop Overlay */
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 999;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .sidebar-overlay.active {
+        opacity: 1;
+        pointer-events: auto;
     }
 
     /* 3. Main Workspace Layout Adjustments */
     .main-content {
         padding: 1rem;
-        padding-bottom: 80px; /* Safe padding for bottom navigation */
-        height: calc(100vh - 64px);
+        padding-bottom: 60px; /* Space for scroll buffer */
+        height: 100vh;
         overflow-y: auto;
     }
 
-    .main-header {
-        margin-bottom: 1rem;
-        flex-direction: row;
-        align-items: center;
+    /* 4. Global Header Mobile Settings */
+    .global-header {
+        height: 60px;
+        padding: 0;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        background-color: transparent;
     }
 
-    .header-welcome h2 {
-        font-size: 1.25rem;
+    .menu-toggle-btn {
+        display: flex; /* Show menu toggle */
     }
 
-    .header-welcome p {
-        font-size: 0.8rem;
-        display: none; /* Hide subtitle on mobile to save vertical space */
+    .header-search-container input {
+        height: 40px;
+        padding: 0 40px 0 36px;
+        font-size: 14px;
     }
 
-    /* 4. Grid Modernization (Transforming multi-column views to stacked views) */
-    .content-grid {
-        grid-template-columns: 1fr !important; /* Force single column on mobile */
+    .header-search-container .search-icon {
+        left: 12px;
+    }
+
+    .search-shortcut-hint {
+        display: none; /* Hide Ctrl K on touch screen */
+    }
+
+    .quick-new-btn span, .profile-name {
+        display: none; /* Hide text, show only icon/avatar */
+    }
+
+    .quick-new-btn {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border-radius: 50%;
+    }
+
+    .notification-btn {
+        width: 40px;
+        height: 40px;
+    }
+
+    /* 5. Metrics Grid (Single column stack on mobile) */
+    .metrics-grid {
+        grid-template-columns: 1fr;
         gap: 1rem;
-        display: flex;
-        flex-direction: column;
     }
 
-    .left-panel {
-        min-height: auto;
+    .metric-card {
         padding: 1rem;
     }
 
-    .right-panel {
+    /* 6. Workspace Split Stack layout */
+    .workspace-split {
+        grid-template-columns: 1fr;
         gap: 1rem;
-        display: flex;
-        flex-direction: column;
+        margin-bottom: 2rem;
     }
 
-    /* 5. Mobile Tab Switcher Container (Managed via mobile-ui.js) */
-    .mobile-tab-view {
-        display: none !important; /* Managed by JS toggle */
-    }
-    
-    .mobile-tab-view.active-tab {
-        display: flex !important;
-        flex-direction: column;
-        animation: fadeIn 0.2s ease-in-out;
+    /* 7. Health footer positioning on mobile */
+    .health-footer {
+        position: static;
+        width: 100%;
+        height: auto;
+        padding: 1rem;
+        background-color: var(--bg-secondary);
+        border-top: 1px solid var(--border-color);
+        box-sizing: border-box;
     }
 
-    /* 6. Form Legibility & Zoom Prevention */
+    .health-status-container {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .health-item {
+        justify-content: flex-start;
+    }
+
+    /* Form Legibility & Zoom Prevention */
     input, select, textarea {
         font-size: 16px !important; /* Prevents auto-zoom on iOS Safari/Android Webview */
     }
 
-    /* 7. Touch Target Optimizations */
-    .btn, button, select, input, .nav-item a {
+    /* Touch Target Optimizations */
+    .btn, button, select, input, .nav-item a, .suggestion-pill {
         min-height: 48px; /* Safe interactive target size */
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+    }
+
+    .prompt-suggestions {
+        gap: 0.35rem;
+    }
+
+    .suggestion-pill {
+        padding: 0 0.75rem;
+        font-size: 0.75rem;
+    }
+
+    .doc-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
+    .doc-tags {
+        margin: 0;
+    }
+
+    .doc-actions {
+        width: 100%;
+        justify-content: flex-end;
+        border-top: 1px solid rgba(255, 255, 255, 0.03);
+        padding-top: 0.5rem;
     }
 
     .viewer-header {
@@ -168,7 +220,7 @@ body {
     }
     
     .viewer-scroller {
-        max-height: 380px; /* Limit scroller height on smaller viewports */
+        max-height: 300px;
     }
 
     .progress-container {
@@ -180,77 +232,6 @@ body {
 
     .progress-legend {
         grid-template-columns: 1fr 1fr;
-        width: 100%;
-    }
-
-    /* Bottom Navigation Bar for Workspaces */
-    .mobile-tab-bar {
-        display: flex;
-        position: fixed;
-        bottom: 64px; /* Stacked above main navigation */
-        left: 0;
-        width: 100vw;
-        height: 48px;
-        background-color: var(--bg-tertiary);
-        border-top: 1px solid var(--border-color);
-        border-bottom: 1px solid var(--border-color);
-        z-index: 999;
-    }
-
-    .mobile-tab-btn {
-        flex: 1;
-        background: none;
-        border: none;
-        color: var(--text-secondary);
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        font-family: 'Outfit', sans-serif;
-        font-size: 0.8rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: var(--transition-fast);
-    }
-
-    .mobile-tab-btn i {
-        font-size: 0.95rem;
-    }
-
-    .mobile-tab-btn.active {
-        color: var(--text-primary);
-        border-bottom: 2px solid var(--accent-purple);
-        background-color: rgba(255, 255, 255, 0.02);
-    }
-
-    /* Shift content down or add padding to main-content so tab headers don't overlap layout */
-    .main-content {
-        padding-top: 1rem;
-        padding-bottom: 120px; /* Space for both tab-bar and sidebar bottom-nav */
-    }
-
-    /* UI Fixes for card scaling */
-    .panel {
-        padding: 1rem;
-    }
-    
-    .circular-progress {
-        width: 100px;
-        height: 100px;
-    }
-    
-    .circular-progress::before {
-        width: 78px;
-        height: 78px;
-    }
-    
-    .value-container {
-        font-size: 1.35rem;
-    }
-
-    .checklist {
-        text-align: left;
         width: 100%;
     }
 }

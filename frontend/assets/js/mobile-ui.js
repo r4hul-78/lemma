@@ -110,10 +110,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const mainNavItems = document.querySelectorAll(".nav-item");
         mainNavItems.forEach(item => {
             item.addEventListener("click", () => {
-                const isDashboardActive = (item.id === "nav-dashboard" || item.id === "nav-plagiarism");
+                const isPlagiarismActive = (item.id === "nav-plagiarism");
                 const currentTabHeader = document.getElementById("mobile-workspace-tabs");
                 if (currentTabHeader) {
-                    if (isDashboardActive && isMobile()) {
+                    if (isPlagiarismActive && isMobile()) {
                         currentTabHeader.style.display = "flex";
                     } else {
                         currentTabHeader.style.display = "none";

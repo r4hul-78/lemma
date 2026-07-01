@@ -8,19 +8,20 @@ class DatabaseService:
     
     @staticmethod
     def get_connection():
-        """Returns a connection to the PostgreSQL database."""
+        """Returns a connection to the PostgreSQL database with a 5-second connection timeout."""
         db_url = os.environ.get("DATABASE_URL") or settings.DATABASE_URL
         if db_url:
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql://", 1)
-            return psycopg2.connect(db_url)
+            return psycopg2.connect(db_url, connect_timeout=5)
             
         conn = psycopg2.connect(
             host=settings.POSTGRES_HOST,
             port=settings.POSTGRES_PORT,
             database=settings.POSTGRES_DB,
             user=settings.POSTGRES_USER,
-            password=settings.POSTGRES_PASSWORD
+            password=settings.POSTGRES_PASSWORD,
+            connect_timeout=5
         )
         return conn
 

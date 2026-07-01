@@ -4,7 +4,7 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     // API URL configuration
-    let API_BASE_URL = 'https://r4hul-78-lemma-backend.hf.space'; // 'http://localhost:8000'; 
+    let API_BASE_URL = 'http://localhost:8000'; // 'https://r4hul-78-lemma-backend.hf.space'; 
     let API_UPLOAD_URL = `${API_BASE_URL}/api/v1/documents/upload`;
     let API_ANALYZE_URL = `${API_BASE_URL}/api/v1/analyze`;
     let API_STATUS_URL = `${API_BASE_URL}/api/v1/status`;
@@ -21,8 +21,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // DOM Elements
-    const serverStatusDot = document.getElementById("server-status-dot");
-    const serverStatusText = document.getElementById("server-status-text");
+    // Main Workspace Layout Views
+    const dashboardHomeView = document.getElementById("dashboard-home-view");
+    const placeholderWorkspace = document.getElementById("placeholder-workspace");
     const dropZone = document.getElementById("drop-zone");
     const fileInput = document.getElementById("file-input");
     const documentViewer = document.getElementById("document-viewer");
@@ -59,6 +60,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let activeFile = null;
     let uploadResponseData = null;
     let currentJobId = null;
+    let isAnalyzing = false;
+    let isParaphrasing = false;
 
     // Initialize Page
     async function initApiConfig() {
@@ -80,17 +83,105 @@ document.addEventListener("DOMContentLoaded", () => {
      * Server Health Checking
      * ------------------------------------------------------------- */
     async function checkServerHealth() {
+        const hOllama = document.getElementById("health-ollama");
+        const hOllamaDot = document.getElementById("health-ollama-dot");
+        const hOllamaText = document.getElementById("health-ollama-text");
+        
+        const hEs = document.getElementById("health-es");
+        const hEsDot = document.getElementById("health-es-dot");
+        const hEsText = document.getElementById("health-es-text");
+        
+        const hDb = document.getElementById("health-db");
+        const hDbDot = document.getElementById("health-db-dot");
+        const hDbText = document.getElementById("health-db-text");
+        
+        const hCelery = document.getElementById("health-celery");
+        const hCeleryDot = document.getElementById("health-celery-dot");
+        const hCeleryText = document.getElementById("health-celery-text");
+
+        if (!hOllama || !hEs || !hDb || !hCelery) return;
+
+        // Force working status during job performance to keep UI clean and accurate
+        if (isAnalyzing || isParaphrasing) {
+            if (isAnalyzing) {
+                hDb.className = "health-item working-orange";
+                hDbText.textContent = "Working";
+                hEs.className = "health-item working-orange";
+                hEsText.textContent = "Working";
+                hCelery.className = "health-item working-orange";
+                hCeleryText.textContent = "Working";
+            }
+            if (isParaphrasing) {
+                hOllama.className = "health-item working-orange";
+                hOllamaText.textContent = "Working";
+            }
+            return;
+        }
+
         try {
-            const response = await fetch(API_HEALTH_URL, { signal: AbortSignal.timeout(3000) });
+            const response = await fetch(API_HEALTH_URL, { signal: AbortSignal.timeout(5000) });
             if (response.ok) {
-                serverStatusDot.className = "status-indicator online";
-                serverStatusText.textContent = "Server: Online";
+                const healthData = await response.json();
+                const services = healthData.services || {};
+                
+                // 1. Ollama status
+                const ollama = services.ollama || {};
+                if (ollama.status === "running") {
+                    hOllama.className = "health-item online-green";
+                    hOllamaText.textContent = "Running";
+                } else if (ollama.status === "no_models") {
+                    hOllama.className = "health-item working-orange";
+                    hOllamaText.textContent = "No Models";
+                } else {
+                    hOllama.className = "health-item offline-red";
+                    hOllamaText.textContent = "Offline";
+                }
+                
+                // 2. Elasticsearch status
+                const es = services.elasticsearch || {};
+                if (es.status === "healthy") {
+                    hEs.className = "health-item healthy-green";
+                    hEsText.textContent = "Healthy";
+                } else if (es.status === "unhealthy") {
+                    hEs.className = "health-item working-orange";
+                    hEsText.textContent = "Degraded";
+                } else {
+                    hEs.className = "health-item offline-red";
+                    hEsText.textContent = "Offline";
+                }
+                
+                // 3. PostgreSQL Database status
+                const db = services.database || {};
+                if (db.status === "connected") {
+                    hDb.className = "health-item connected-green";
+                    hDbText.textContent = "Connected";
+                } else {
+                    hDb.className = "health-item offline-red";
+                    hDbText.textContent = "Offline";
+                }
+                
+                // 4. Celery Queue status (Idle vs Working)
+                const celery = services.celery || {};
+                const isFrontendRunningJob = (currentJobId !== null && uploadResponseData === null);
+                if (isFrontendRunningJob || celery.status === "working") {
+                    hCelery.className = "health-item working-orange";
+                    hCeleryText.textContent = "Working";
+                } else if (celery.status === "idle") {
+                    hCelery.className = "health-item idle-green";
+                    hCeleryText.textContent = "Idle";
+                } else {
+                    hCelery.className = "health-item offline-red";
+                    hCeleryText.textContent = "Offline";
+                }
             } else {
-                throw new Error("Server status abnormal");
+                throw new Error("Health response not OK");
             }
         } catch (error) {
-            serverStatusDot.className = "status-indicator offline";
-            serverStatusText.textContent = "Server: Offline";
+            console.error("Health footer check failed:", error);
+            hOllama.className = "health-item offline-red"; hOllamaText.textContent = "Offline";
+            hEs.className = "health-item offline-red"; hEsText.textContent = "Offline";
+            hDb.className = "health-item offline-red"; hDbText.textContent = "Offline";
+            hCelery.className = "health-item offline-red"; hCeleryText.textContent = "Offline";
         }
     }
 
@@ -256,6 +347,10 @@ document.addEventListener("DOMContentLoaded", () => {
         metaStatus.innerHTML = '<span class="badge badge-dim">Queued...</span>';
         lexicalChk.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking Lexical Database...';
         lexicalChk.className = "checklist-item done";
+
+        // Mark that a job is actively running to update the health footer to Working
+        isAnalyzing = true;
+        checkServerHealth();
         
         const formData = new FormData();
         formData.append("file", file);
@@ -284,6 +379,8 @@ document.addEventListener("DOMContentLoaded", () => {
             metaStatus.innerHTML = '<span class="badge badge-dim">Failed</span>';
             btnRunAnalysis.disabled = false;
             resetMetricsUI();
+            isAnalyzing = false;
+            checkServerHealth();
         }
     }
 
@@ -304,6 +401,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 if (data.status === "completed") {
                     clearInterval(interval);
+                    isAnalyzing = false;
+                    checkServerHealth();
+                    
                     uploadResponseData = data.result;
                     
                     showToast("Document analysis complete!", "success");
@@ -363,6 +463,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 } else if (data.status === "failed") {
                     clearInterval(interval);
+                    isAnalyzing = false;
+                    checkServerHealth();
                     throw new Error(data.error || "Analysis task failed");
                 } else if (data.status === "processing") {
                     metaStatus.innerHTML = '<span class="badge badge-dim">Analyzing...</span>';
@@ -374,6 +476,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             } catch (error) {
                 clearInterval(interval);
+                isAnalyzing = false;
+                checkServerHealth();
+                
                 console.error("Polling Error:", error);
                 showToast(error.message, "error");
                 
@@ -708,6 +813,40 @@ document.addEventListener("DOMContentLoaded", () => {
         window.open(`${API_BASE_URL}/api/v1/documents/report/${currentJobId}`, "_blank");
     });
 
+    // Notification Dropdown Toggle & Clear Event Handlers
+    const notificationBtn = document.getElementById("notification-btn");
+    const notificationDropdown = document.getElementById("notification-dropdown");
+    const btnClearNotifications = document.getElementById("btn-clear-notifications");
+    const notificationBadge = document.getElementById("notification-badge");
+
+    if (notificationBtn && notificationDropdown) {
+        notificationBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            notificationDropdown.classList.toggle("hidden");
+        });
+
+        // Hide dropdown when clicking outside
+        document.addEventListener("click", (e) => {
+            if (!notificationDropdown.contains(e.target) && e.target !== notificationBtn && !notificationBtn.contains(e.target)) {
+                notificationDropdown.classList.add("hidden");
+            }
+        });
+
+        if (btnClearNotifications) {
+            btnClearNotifications.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (notificationBadge) {
+                    notificationBadge.classList.remove("active");
+                }
+                const notificationList = document.getElementById("notification-list");
+                if (notificationList) {
+                    notificationList.innerHTML = '<div class="notification-empty">No new notifications</div>';
+                }
+                showToast("Notifications cleared.", "info");
+            });
+        }
+    }
+
     // Paraphrase button triggers Ollama API call
     btnQuickParaphrase.addEventListener("click", async () => {
         const sentenceText = inspectText.textContent.replace(/^"|"$/g, "").trim();
@@ -720,6 +859,10 @@ document.addEventListener("DOMContentLoaded", () => {
         btnQuickParaphrase.disabled = true;
         btnQuickParaphrase.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Paraphrasing...';
         showToast("Paraphrasing segment with local Ollama...", "info");
+
+        // Mark that Ollama is paraphrasing to update the health footer to Working
+        isParaphrasing = true;
+        checkServerHealth();
 
         try {
             const response = await fetch(API_REWRITE_URL, {
@@ -747,6 +890,8 @@ document.addEventListener("DOMContentLoaded", () => {
             // Restore button
             btnQuickParaphrase.disabled = false;
             btnQuickParaphrase.innerHTML = '<i class="fa-solid fa-pen-nib"></i> Paraphrase Segment';
+            isParaphrasing = false;
+            checkServerHealth();
         }
     });
 
@@ -757,40 +902,213 @@ document.addEventListener("DOMContentLoaded", () => {
     const dashboardWorkspace = document.getElementById("dashboard-workspace");
     const paraphraserWorkspace = document.getElementById("paraphraser-workspace");
 
+    function hideAllWorkspaces() {
+        const views = [
+            dashboardHomeView,
+            dashboardWorkspace,
+            paraphraserWorkspace,
+            reportsWorkspace,
+            placeholderWorkspace
+        ];
+        views.forEach(v => {
+            if (v) v.classList.add("hidden");
+        });
+    }
+
     navItems.forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
             
+            // Deactivate all nav items
+            navItems.forEach(n => n.classList.remove("active"));
+            item.classList.add("active");
+            
+            // Close mobile sidebar drawer if it was opened
+            const sidebar = document.getElementById("sidebar-panel");
+            const overlay = document.querySelector(".sidebar-overlay");
+            if (sidebar && sidebar.classList.contains("open")) {
+                sidebar.classList.remove("open");
+                if (overlay) overlay.classList.remove("active");
+            }
+            
             const tabId = item.id;
-            if (tabId === "nav-dashboard" || tabId === "nav-plagiarism") {
-                // Activate both dashboard & plagiarism links in sidebar to keep them synced
-                navItems.forEach(n => n.classList.remove("active"));
-                document.getElementById("nav-dashboard").classList.add("active");
-                document.getElementById("nav-plagiarism").classList.add("active");
-                
-                dashboardWorkspace.classList.remove("hidden");
-                paraphraserWorkspace.classList.add("hidden");
-                reportsWorkspace.classList.add("hidden");
-            } else if (tabId === "nav-paraphraser") {
-                navItems.forEach(n => n.classList.remove("active"));
-                item.classList.add("active");
-                
-                dashboardWorkspace.classList.add("hidden");
-                paraphraserWorkspace.classList.remove("hidden");
-                reportsWorkspace.classList.add("hidden");
-            } else if (tabId === "nav-reports") {
-                navItems.forEach(n => n.classList.remove("active"));
-                item.classList.add("active");
-                
-                dashboardWorkspace.classList.add("hidden");
-                paraphraserWorkspace.classList.add("hidden");
-                reportsWorkspace.classList.remove("hidden");
+            hideAllWorkspaces();
+            
+            if (tabId === "nav-dashboard") {
+                if (dashboardHomeView) dashboardHomeView.classList.remove("hidden");
+            } else if (tabId === "nav-aichat") {
+                if (paraphraserWorkspace) paraphraserWorkspace.classList.remove("hidden");
+            } else if (tabId === "nav-plagiarism") {
+                if (dashboardWorkspace) dashboardWorkspace.classList.remove("hidden");
+            } else if (tabId === "nav-export") {
+                if (reportsWorkspace) reportsWorkspace.classList.remove("hidden");
                 renderReportsHistory();
             } else {
-                showToast(`${item.textContent.trim()} workspace module is coming in Phase 4/5.`, "info");
+                // Non-functional pages -> show placeholder
+                if (placeholderWorkspace) {
+                    const pIcon = document.getElementById("placeholder-icon");
+                    const pTitle = document.getElementById("placeholder-title");
+                    const pDesc = document.getElementById("placeholder-desc");
+                    const pSprint = document.getElementById("placeholder-sprint");
+                    
+                    let title = "Workspace Section";
+                    let iconClass = "fa-folder-open";
+                    let desc = "This module is currently queued for expansion in a future development sprint.";
+                    let sprint = "Sprint 2";
+                    
+                    if (tabId === "nav-projects") {
+                        title = "My Projects";
+                        iconClass = "fa-folder-open";
+                        desc = "Organize drafts, citations, annotations, and AI threads into local sandboxed projects.";
+                        sprint = "Sprint 2";
+                    } else if (tabId === "nav-litreview") {
+                        title = "Literature Review Workspace";
+                        iconClass = "fa-book-open";
+                        desc = "Compare research methodologies, identify research gaps, list limitations, and compile theme summaries.";
+                        sprint = "Sprint 3";
+                    } else if (tabId === "nav-citations") {
+                        title = "Citation Generator";
+                        iconClass = "fa-quote-right";
+                        desc = "Generate academic citations in APA, IEEE, MLA, Chicago, Harvard, BibTeX, and RIS formats.";
+                        sprint = "Sprint 3";
+                    } else if (tabId === "nav-notes") {
+                        title = "Academic Note Editor";
+                        iconClass = "fa-note-sticky";
+                        desc = "Create rich text study notes integrated with LaTeX math support, tables, images, and Markdown.";
+                        sprint = "Sprint 2";
+                    } else if (tabId === "nav-kb") {
+                        title = "Personal Knowledge Base";
+                        iconClass = "fa-database";
+                        desc = "Organize references, summaries, and notes into collections, folders, and custom tags.";
+                        sprint = "Sprint 4";
+                    } else if (tabId === "nav-pdfsummary") {
+                        title = "PDF AI Summarizer";
+                        iconClass = "fa-file-contract";
+                        desc = "Summarize academic publications, extracts key formulas, and lists methodologies locally.";
+                        sprint = "Sprint 2";
+                    } else if (tabId === "nav-settings") {
+                        title = "System Settings";
+                        iconClass = "fa-gear";
+                        desc = "Configure on-device AI model selections, generation parameters (temperature, max tokens), storage paths, and UI theme options.";
+                        sprint = "Sprint 1 / 5";
+                    } else if (tabId === "nav-support") {
+                        title = "Help & Support Center";
+                        iconClass = "fa-circle-question";
+                        desc = "Troubleshoot local engine setups (Ollama, PostgreSQL, Elasticsearch) and read keyboard shortcuts guides.";
+                        sprint = "Sprint 1";
+                    }
+                    
+                    if (pIcon) pIcon.className = `fa-solid ${iconClass}`;
+                    if (pTitle) pTitle.textContent = title;
+                    if (pDesc) pDesc.textContent = desc;
+                    if (pSprint) pSprint.textContent = sprint;
+                    
+                    placeholderWorkspace.classList.remove("hidden");
+                }
             }
         });
     });
+
+    // Return to dashboard button in placeholder page
+    const btnPlaceholderBack = document.getElementById("btn-placeholder-back");
+    if (btnPlaceholderBack) {
+        btnPlaceholderBack.addEventListener("click", () => {
+            const dashNav = document.getElementById("nav-dashboard");
+            if (dashNav) dashNav.click();
+        });
+    }
+
+    // Keyboard Shortcuts for Search Input (Ctrl K or Ctrl /)
+    document.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey && e.key.toLowerCase() === 'k') || (e.ctrlKey && e.key === '/')) {
+            e.preventDefault();
+            const searchInput = document.getElementById("global-search-input");
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.select();
+            }
+        }
+    });
+
+    // Prompt Box Suggestions Injection
+    document.querySelectorAll(".suggestion-pill").forEach(pill => {
+        pill.addEventListener("click", () => {
+            const promptText = pill.dataset.prompt;
+            const promptInput = document.getElementById("dashboard-prompt-input");
+            if (promptInput && promptText) {
+                promptInput.value = promptText;
+                promptInput.focus();
+            }
+        });
+    });
+
+    // Forward Ask AI prompts to AI Chat workspace
+    const btnSendPrompt = document.getElementById("btn-send-prompt");
+    if (btnSendPrompt) {
+        btnSendPrompt.addEventListener("click", () => {
+            const promptInput = document.getElementById("dashboard-prompt-input");
+            const promptVal = promptInput ? promptInput.value.trim() : "";
+            if (!promptVal) {
+                showToast("Please enter a research question or rewrite draft.", "error");
+                return;
+            }
+            
+            // Swap to AI Chat (Paraphraser) tab
+            const aichatNav = document.getElementById("nav-aichat");
+            if (aichatNav) {
+                const paraInput = document.getElementById("para-input-text");
+                if (paraInput) {
+                    paraInput.value = promptVal;
+                    paraInput.dispatchEvent(new Event("input"));
+                }
+                aichatNav.click();
+                
+                // Automatically trigger paraphrase run
+                const btnRunPara = document.getElementById("btn-run-paraphrase");
+                if (btnRunPara) btnRunPara.click();
+            }
+        });
+    }
+
+    // Redirect to Plagiarism workspace on click
+    const redirectAndIngest = () => {
+        const plagNav = document.getElementById("nav-plagiarism");
+        if (plagNav) {
+            plagNav.click();
+            const fileInput = document.getElementById("file-input");
+            if (fileInput) fileInput.click();
+        }
+    };
+    
+    const btnUploadNewDash = document.getElementById("btn-upload-new-dash");
+    if (btnUploadNewDash) btnUploadNewDash.addEventListener("click", redirectAndIngest);
+    
+    const btnQuickNew = document.getElementById("btn-quick-new");
+    if (btnQuickNew) btnQuickNew.addEventListener("click", redirectAndIngest);
+
+    // Setup mobile sidebar drawer backdrop overlay
+    const menuToggleBtn = document.getElementById("menu-toggle-btn");
+    const sidebarPanel = document.getElementById("sidebar-panel");
+    if (menuToggleBtn && sidebarPanel) {
+        let overlay = document.querySelector(".sidebar-overlay");
+        if (!overlay) {
+            overlay = document.createElement("div");
+            overlay.className = "sidebar-overlay";
+            document.body.appendChild(overlay);
+        }
+        
+        menuToggleBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            sidebarPanel.classList.toggle("open");
+            overlay.classList.toggle("active");
+        });
+        
+        overlay.addEventListener("click", () => {
+            sidebarPanel.classList.remove("open");
+            overlay.classList.remove("active");
+        });
+    }
+
 
     /* -------------------------------------------------------------
      * Plagiarism-Free Generator Workspace Logic [NEW]
@@ -1040,14 +1358,13 @@ document.addEventListener("DOMContentLoaded", () => {
         applyPlagiarismHighlights(analysis);
         btnRunAnalysis.disabled = false;
         
-        // Switch view to dashboard
+        // Switch view to Plagiarism Check
         navItems.forEach(n => n.classList.remove("active"));
-        document.getElementById("nav-dashboard").classList.add("active");
-        document.getElementById("nav-plagiarism").classList.add("active");
+        const plagNav = document.getElementById("nav-plagiarism");
+        if (plagNav) plagNav.classList.add("active");
         
-        dashboardWorkspace.classList.remove("hidden");
-        paraphraserWorkspace.classList.add("hidden");
-        reportsWorkspace.classList.add("hidden");
+        hideAllWorkspaces();
+        if (dashboardWorkspace) dashboardWorkspace.classList.remove("hidden");
         
         showToast(`Loaded analysis report for ${reportItem.filename}`, "success");
     }

@@ -20,7 +20,7 @@
 
     <div class="app-container">
         <!-- Sidebar Navigation -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar-panel">
             <div class="sidebar-brand">
                 <i class="fa-solid fa-graduation-cap brand-icon"></i>
                 <div class="brand-text">
@@ -30,47 +30,345 @@
             </div>
             
             <nav class="sidebar-nav">
+                <div class="nav-section-title">Core Items</div>
                 <ul>
                     <li class="nav-item active" id="nav-dashboard">
                         <a href="#"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
                     </li>
+                    <li class="nav-item" id="nav-aichat">
+                        <a href="#"><i class="fa-solid fa-comments"></i> AI Chat</a>
+                    </li>
+                    <li class="nav-item" id="nav-projects">
+                        <a href="#"><i class="fa-solid fa-folder-open"></i> My Projects</a>
+                    </li>
+                    <li class="nav-item" id="nav-litreview">
+                        <a href="#"><i class="fa-solid fa-book-open"></i> Literature Review</a>
+                    </li>
+                    <li class="nav-item" id="nav-citations">
+                        <a href="#"><i class="fa-solid fa-quote-right"></i> Citations</a>
+                    </li>
                     <li class="nav-item" id="nav-plagiarism">
-                        <a href="#"><i class="fa-solid fa-shield-halved"></i> Plagiarism Checker</a>
+                        <a href="#"><i class="fa-solid fa-shield-halved"></i> Plagiarism Check</a>
                     </li>
-                    <li class="nav-item" id="nav-paraphraser">
-                        <a href="#"><i class="fa-solid fa-pen-nib"></i> Paraphraser</a>
+                    <li class="nav-item" id="nav-notes">
+                        <a href="#"><i class="fa-solid fa-note-sticky"></i> Notes</a>
                     </li>
-                    <li class="nav-item" id="nav-reports">
-                        <a href="#"><i class="fa-solid fa-file-pdf"></i> Reports</a>
+                    <li class="nav-item" id="nav-kb">
+                        <a href="#"><i class="fa-solid fa-database"></i> Knowledge Base</a>
+                    </li>
+                </ul>
+
+                <div class="nav-section-title">Tools</div>
+                <ul>
+                    <li class="nav-item" id="nav-pdfsummary">
+                        <a href="#"><i class="fa-solid fa-file-contract"></i> PDF to Summary</a>
+                    </li>
+                    <li class="nav-item" id="nav-export">
+                        <a href="#"><i class="fa-solid fa-file-export"></i> Export</a>
+                    </li>
+                </ul>
+
+                <div class="nav-section-title">System</div>
+                <ul>
+                    <li class="nav-item" id="nav-settings">
+                        <a href="#"><i class="fa-solid fa-gear"></i> Settings</a>
+                    </li>
+                    <li class="nav-item" id="nav-support">
+                        <a href="#"><i class="fa-solid fa-circle-question"></i> Help & Support</a>
                     </li>
                 </ul>
             </nav>
 
             <div class="sidebar-footer">
-                <div class="server-status">
-                    <span class="status-indicator offline" id="server-status-dot"></span>
-                    <span id="server-status-text">Checking server...</span>
-                </div>
                 <div class="version">v1.0.0-beta</div>
             </div>
         </aside>
 
         <!-- Main Workspace -->
         <main class="main-content">
-            <!-- Header -->
-            <header class="main-header">
-                <div class="header-welcome">
-                    <h2>Hello, Researcher <span class="wave-emoji">👋</span></h2>
-                    <p>Analyze your academic documents for lexical and semantic integrity.</p>
+            <!-- Global Header -->
+            <header class="global-header">
+                <div class="header-left">
+                    <button class="menu-toggle-btn" id="menu-toggle-btn" aria-label="Toggle Sidebar">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <div class="header-search-container">
+                        <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="global-search-input" placeholder="Search across documents, chats, projects..." autocomplete="off">
+                        <span class="search-shortcut-hint">Ctrl K</span>
+                    </div>
                 </div>
-                <div class="header-profile">
-                    <div class="profile-avatar">R</div>
+                <div class="header-right">
+                    <button class="btn btn-primary quick-new-btn" id="btn-quick-new" title="New Workspace">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        <span>New</span>
+                    </button>
+                    <div class="notification-container">
+                        <button class="notification-btn" id="notification-btn" aria-label="Notifications">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                            <span class="notification-badge" id="notification-badge"></span>
+                        </button>
+                        <div class="notification-dropdown hidden" id="notification-dropdown">
+                            <div class="notification-dropdown-header">
+                                <h3>Notifications</h3>
+                                <button id="btn-clear-notifications">Clear</button>
+                            </div>
+                            <div class="notification-list" id="notification-list">
+                                <div class="notification-empty">No new notifications</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="header-profile" id="header-profile-menu">
+                        <div class="profile-avatar">R</div>
+                        <span class="profile-name">Researcher</span>
+                    </div>
                 </div>
             </header>
 
-            <!-- Dashboard Content Grid -->
-            <div class="content-grid" id="dashboard-workspace">
-                
+            <!-- ==================== 1. DASHBOARD HOME VIEW ==================== -->
+            <div class="workspace-view" id="dashboard-home-view">
+                <!-- Performance Counter Metrics -->
+                <section class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-icon-wrap blue-theme">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Total Papers</span>
+                            <span class="metric-value" id="metric-papers">12</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon-wrap purple-theme">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">My Projects</span>
+                            <span class="metric-value" id="metric-projects">4</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon-wrap green-theme">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">AI Interactions</span>
+                            <span class="metric-value" id="metric-interactions">48</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon-wrap orange-theme">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 2.5-1 4-3 5v1zM17 21c3 0 7-1 7-8V5c0-1.25-.75-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 2.5-1 4-3 5v1z"></path>
+                            </svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Citations Generated</span>
+                            <span class="metric-value" id="metric-citations">86</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Workspace Split -->
+                <div class="workspace-split">
+                    <!-- Primary Column: AI Assistant & Recent Documents -->
+                    <div class="primary-column">
+                        <!-- AI Assistant Interface -->
+                        <div class="panel assistant-box-card">
+                            <h3>AI Research Assistant</h3>
+                            <div class="inline-prompt-box">
+                                <textarea id="dashboard-prompt-input" placeholder="Ask Lemma to summarize, explain, or rewrite a concept..."></textarea>
+                                <div class="prompt-box-footer">
+                                    <div class="prompt-box-actions">
+                                        <button class="prompt-action-btn" title="Attach Document" id="btn-prompt-attach">
+                                            <i class="fa-solid fa-paperclip"></i>
+                                        </button>
+                                        <button class="prompt-action-btn" title="Use Voice Input" id="btn-prompt-mic">
+                                            <i class="fa-solid fa-microphone"></i>
+                                        </button>
+                                    </div>
+                                    <button class="btn btn-primary btn-sm send-prompt-btn" id="btn-send-prompt">
+                                        <span>Ask AI</span> <i class="fa-solid fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="prompt-suggestions">
+                                <button class="suggestion-pill" data-prompt="Summarize the key findings of my uploaded paper.">
+                                    <i class="fa-solid fa-align-left"></i> Summarize
+                                </button>
+                                <button class="suggestion-pill" data-prompt="Find related local research papers in my database.">
+                                    <i class="fa-solid fa-magnifying-glass"></i> Find Related
+                                </button>
+                                <button class="suggestion-pill" data-prompt="Run plagiarism check on the active document.">
+                                    <i class="fa-solid fa-shield-halved"></i> Check Plagiarism
+                                </button>
+                                <button class="suggestion-pill" data-prompt="Explain the core methodologies of Qwen 2.5 models.">
+                                    <i class="fa-solid fa-brain"></i> Explain Concept
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Recent Document Repository -->
+                        <div class="panel recent-docs-card">
+                            <div class="panel-header-row">
+                                <h3>Recent Document Repository</h3>
+                                <button class="btn btn-sm btn-outline" id="btn-upload-new-dash">
+                                    <i class="fa-solid fa-arrow-up-from-bracket"></i> Ingest Document
+                                </button>
+                            </div>
+                            <div class="docs-list" id="recent-docs-list">
+                                <div class="doc-row">
+                                    <div class="doc-meta-info">
+                                        <i class="fa-solid fa-file-pdf doc-type-icon pdf"></i>
+                                        <div class="doc-details">
+                                            <span class="doc-name">transformer_architecture_survey.pdf</span>
+                                            <span class="doc-time">Edited 2 hours ago</span>
+                                        </div>
+                                    </div>
+                                    <div class="doc-tags">
+                                        <span class="doc-tag">NLP</span>
+                                        <span class="doc-tag">Deep Learning</span>
+                                    </div>
+                                    <div class="doc-actions">
+                                        <button class="doc-bookmark-btn active" title="Bookmark Draft">
+                                            <i class="fa-solid fa-star"></i>
+                                        </button>
+                                        <button class="doc-options-btn" title="Options">
+                                            <i class="fa-solid fa-ellipsis-vertical"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="doc-row">
+                                    <div class="doc-meta-info">
+                                        <i class="fa-solid fa-file-word doc-type-icon docx"></i>
+                                        <div class="doc-details">
+                                            <span class="doc-name">attention_is_all_you_need_review.docx</span>
+                                            <span class="doc-time">Edited 1 day ago</span>
+                                        </div>
+                                    </div>
+                                    <div class="doc-tags">
+                                        <span class="doc-tag">Attention</span>
+                                        <span class="doc-tag">Academic</span>
+                                    </div>
+                                    <div class="doc-actions">
+                                        <button class="doc-bookmark-btn" title="Bookmark Draft">
+                                            <i class="fa-regular fa-star"></i>
+                                        </button>
+                                        <button class="doc-options-btn" title="Options">
+                                            <i class="fa-solid fa-ellipsis-vertical"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="doc-row">
+                                    <div class="doc-meta-info">
+                                        <i class="fa-solid fa-file-lines doc-type-icon txt"></i>
+                                        <div class="doc-details">
+                                            <span class="doc-name">local_vector_db_benchmarks.txt</span>
+                                            <span class="doc-time">Edited 3 days ago</span>
+                                        </div>
+                                    </div>
+                                    <div class="doc-tags">
+                                        <span class="doc-tag">Vector Search</span>
+                                        <span class="doc-tag">Database</span>
+                                    </div>
+                                    <div class="doc-actions">
+                                        <button class="doc-bookmark-btn" title="Bookmark Draft">
+                                            <i class="fa-regular fa-star"></i>
+                                        </button>
+                                        <button class="doc-options-btn" title="Options">
+                                            <i class="fa-solid fa-ellipsis-vertical"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Secondary Column: Active Projects & Activity Timeline -->
+                    <div class="secondary-column">
+                        <!-- Active Projects Stack -->
+                        <div class="panel projects-stack-card">
+                            <h3>Active Projects</h3>
+                            <div class="projects-stack" id="active-projects-list">
+                                <a href="#" class="project-stack-item">
+                                    <div class="project-info">
+                                        <span class="project-name">Academic Rewrite AI</span>
+                                        <span class="project-count">3 papers</span>
+                                    </div>
+                                    <span class="project-badge purple">Active</span>
+                                </a>
+                                <a href="#" class="project-stack-item">
+                                    <div class="project-info">
+                                        <span class="project-name">Plagiarism Engine Benchmarks</span>
+                                        <span class="project-count">5 papers</span>
+                                    </div>
+                                    <span class="project-badge blue">Review</span>
+                                </a>
+                                <a href="#" class="project-stack-item">
+                                    <div class="project-info">
+                                        <span class="project-name">spaCy Coordinates Calibration</span>
+                                        <span class="project-count">2 papers</span>
+                                    </div>
+                                    <span class="project-badge green">Completed</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- System Activity Timeline -->
+                        <div class="panel activity-timeline-card">
+                            <h3>System Activity</h3>
+                            <div class="activity-timeline" id="activity-timeline-list">
+                                <div class="timeline-item">
+                                    <span class="timeline-dot"></span>
+                                    <div class="timeline-content">
+                                        <span class="timeline-action">Ran Plagiarism Scan</span>
+                                        <span class="timeline-detail">Completed analysis on transformer_survey.pdf</span>
+                                        <span class="timeline-time">Just now</span>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <span class="timeline-dot"></span>
+                                    <div class="timeline-content">
+                                        <span class="timeline-action">Indexed Reference Document</span>
+                                        <span class="timeline-detail">Indexed 120 text paragraphs to Elasticsearch</span>
+                                        <span class="timeline-time">2 hours ago</span>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <span class="timeline-dot"></span>
+                                    <div class="timeline-content">
+                                        <span class="timeline-action">Ollama Connection Calibrated</span>
+                                        <span class="timeline-detail">Built custom lemma-model parameters on local CPU</span>
+                                        <span class="timeline-time">Yesterday</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 2. PLAGIARISM CHECKER WORKSPACE ==================== -->
+            <div class="workspace-view content-grid hidden" id="dashboard-workspace">
                 <!-- Left Panel: Ingestion or Viewer -->
                 <section class="left-panel panel">
                     <!-- Drop Zone (Shown by default) -->
@@ -141,11 +439,10 @@
                         </div>
                     </div>
 
-                    <!-- Plagiarism Matcher Metrics (Phase 2 Preview) -->
+                    <!-- Plagiarism Matcher Metrics -->
                     <div class="panel progress-card">
                         <div class="card-header-row">
                             <h3>Integrity Profile</h3>
-                            <span class="badge badge-purple">Phase 2 Preview</span>
                         </div>
                         <div class="progress-container">
                             <div class="circular-progress">
@@ -204,7 +501,7 @@
                                 <blockquote id="inspect-text">""</blockquote>
                             </div>
                             
-                            <!-- Plagiarism Match details (shown only if plagiarized) -->
+                            <!-- Plagiarism Match details -->
                             <div class="plagiarism-match-details hidden" id="plagiarism-match-details">
                                 <div class="inspector-text-block">
                                     <label>Integrity Check Match Info</label>
@@ -237,8 +534,8 @@
                 </aside>
             </div>
 
-            <!-- Paraphraser Content Grid [NEW] -->
-            <div class="content-grid hidden" id="paraphraser-workspace">
+            <!-- ==================== 3. AI CHAT WORKSPACE (PARAPHRASER INTERFACE) ==================== -->
+            <div class="workspace-view content-grid hidden" id="paraphraser-workspace">
                 <!-- Left Panel: Text Input -->
                 <section class="left-panel panel">
                     <div class="panel-header-row">
@@ -293,11 +590,11 @@
                             </div>
                         </div>
                     </div>
+                </aside>
             </div>
 
-            <!-- Reports History Workspace [NEW] -->
-            <div class="content-grid hidden" id="reports-workspace">
-                <!-- Left Panel: Reports List Table -->
+            <!-- ==================== 4. EXPORT / REPORTS WORKSPACE ==================== -->
+            <div class="workspace-view content-grid hidden" id="reports-workspace">
                 <section class="left-panel panel" style="grid-column: span 12;">
                     <div class="panel-header-row">
                         <div>
@@ -338,8 +635,53 @@
                     </div>
                 </section>
             </div>
+
+            <!-- ==================== 5. NON-FUNCTIONAL PLACEHOLDER WORKSPACE ==================== -->
+            <div class="workspace-view hidden" id="placeholder-workspace">
+                <section class="panel placeholder-card" style="grid-column: span 12;">
+                    <div class="placeholder-content">
+                        <div class="icon-circle">
+                            <i id="placeholder-icon" class="fa-solid fa-folder-open"></i>
+                        </div>
+                        <h2 id="placeholder-title">Workspace Section</h2>
+                        <p id="placeholder-desc">This module is currently queued for expansion in a future development sprint. The local architecture and storage systems are ready for activation.</p>
+                        <div class="placeholder-sprint-badge">
+                            <span>Target Milestone: </span><strong id="placeholder-sprint">Sprint 2</strong>
+                        </div>
+                        <button class="btn btn-primary" id="btn-placeholder-back">
+                            <i class="fa-solid fa-arrow-left"></i> Return to Dashboard
+                        </button>
+                    </div>
+                </section>
+            </div>
         </main>
     </div>
+
+    <!-- Sticky On-Device Engine Status Monitor -->
+    <footer class="health-footer">
+        <div class="health-status-container">
+            <div class="health-item" id="health-ollama" title="Ollama Model Status">
+                <span class="status-indicator offline" id="health-ollama-dot"></span>
+                <span class="health-label">Ollama (lemma-model):</span>
+                <span class="health-status-text" id="health-ollama-text">Offline</span>
+            </div>
+            <div class="health-item" id="health-es" title="Elasticsearch Cluster Status">
+                <span class="status-indicator offline" id="health-es-dot"></span>
+                <span class="health-label">Elasticsearch:</span>
+                <span class="health-status-text" id="health-es-text">Offline</span>
+            </div>
+            <div class="health-item" id="health-db" title="PostgreSQL Vector DB Status">
+                <span class="status-indicator offline" id="health-db-dot"></span>
+                <span class="health-label">PostgreSQL:</span>
+                <span class="health-status-text" id="health-db-text">Offline</span>
+            </div>
+            <div class="health-item" id="health-celery" title="Background Task Activity">
+                <span class="status-indicator offline" id="health-celery-dot"></span>
+                <span class="health-label">Celery Status:</span>
+                <span class="health-status-text" id="health-celery-text">Offline</span>
+            </div>
+        </div>
+    </footer>
 
     <!-- Error/Notification Toast -->
     <div class="toast-container" id="toast-container"></div>

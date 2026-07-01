@@ -87,7 +87,175 @@ from fastapi.staticfiles import StaticFiles
 @app.get("/health")
 @app.get(f"{settings.API_V1_STR}/health")
 async def health():
-    return {"status": "ok", "project": settings.PROJECT_NAME}
+    import logging
+    import asyncio
+    import httpx
+    import anyio
+    import socket
+    from urllib.parse import urlparse
+    from app.services.database import DatabaseService
+    
+    local_logger = logging.getLogger("health_check")
+    
+    # Clean loopback helper to prevent Windows getaddrinfo latency
+    def clean_host(host_str: str) -> str:
+        if host_str and host_str.lower() == "localhost":
+            return "127.0.0.1"
+        return host_str
+
+    # Socket precheck helper
+    def is_port_open_sync(h: str, p: int) -> bool:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.2)
+                return s.connect_ex((clean_host(h), p)) == 0
+        except Exception:
+            return False
+
+    async def is_port_open(h: str, p: int) -> bool:
+        return await anyio.to_thread.run_sync(is_port_open_sync, h, p)
+
+    # Parse Postgres host/ports
+    db_host = settings.POSTGRES_HOST
+    db_port = int(settings.POSTGRES_PORT or 5432)
+    db_url = settings.DATABASE_URL
+    if db_url:
+        try:
+            parsed = urlparse(db_url)
+            if parsed.hostname:
+                db_host = parsed.hostname
+            if parsed.port:
+                db_port = parsed.port
+        except Exception:
+            pass
+
+    # Parse Redis host/ports
+    redis_host = "localhost"
+    redis_port = 6379
+    redis_url = settings.REDIS_URL
+    if redis_url:
+        try:
+            parsed = urlparse(redis_url)
+            if parsed.hostname:
+                redis_host = parsed.hostname
+            if parsed.port:
+                redis_port = parsed.port
+        except Exception:
+            pass
+
+    # 1. Define PostgreSQL checker task
+    async def check_database():
+        if not await is_port_open(db_host, db_port):
+            return "disconnected"
+        try:
+            def check_db():
+                conn = DatabaseService.get_connection()
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1;")
+                conn.close()
+                return "connected"
+                
+            return await asyncio.wait_for(
+                anyio.to_thread.run_sync(check_db),
+                timeout=1.0
+            )
+        except Exception as e:
+            local_logger.warning(f"Health check: Database connection failed: {e}")
+            return "disconnected"
+
+    # 2. Define Elasticsearch checker task
+    async def check_elasticsearch():
+        try:
+            async with httpx.AsyncClient(timeout=0.8) as client:
+                res = await client.get(settings.ELASTICSEARCH_URL)
+                if res.status_code == 200:
+                    return "healthy"
+                else:
+                    return "unhealthy"
+        except Exception as e:
+            local_logger.warning(f"Health check: Elasticsearch ping failed: {e}")
+            return "offline"
+
+    # 3. Define Ollama checker task
+    async def check_ollama():
+        try:
+            # Check Ollama status directly with a fast 1.0s timeout
+            url = f"{settings.OLLAMA_URL.rstrip('/')}/api/tags"
+            async with httpx.AsyncClient(timeout=1.0) as client:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    data = response.json()
+                    models = [m["name"] for m in data.get("models", [])]
+                    status_val = "running" if models else "no_models"
+                    return status_val, models
+                else:
+                    return "offline", []
+        except Exception as e:
+            local_logger.warning(f"Health check: Ollama check failed: {e}")
+            return "offline", []
+
+    # 4. Define Celery checker task
+    async def check_celery_status():
+        if settings.CELERY_ALWAYS_EAGER:
+            return "idle"
+            
+        if not await is_port_open(redis_host, redis_port):
+            return "offline"
+            
+        try:
+            def check_celery():
+                inspector = celery_app.control.inspect(timeout=0.5)
+                active_tasks = inspector.active()
+                if active_tasks:
+                    has_active = any(len(tasks) > 0 for tasks in active_tasks.values() if tasks)
+                    if has_active:
+                        return "working"
+                return "idle"
+                
+            return await asyncio.wait_for(
+                anyio.to_thread.run_sync(check_celery),
+                timeout=1.0
+            )
+        except Exception as e:
+            local_logger.warning(f"Health check: Celery status check failed: {e}")
+            return "offline"
+
+    # Run all checks in parallel
+    db_task = check_database()
+    es_task = check_elasticsearch()
+    ollama_task = check_ollama()
+    celery_task = check_celery_status()
+    
+    db_status, es_status, (ollama_status, available_models), celery_status = await asyncio.gather(
+        db_task, es_task, ollama_task, celery_task
+    )
+
+    # Determine general status
+    general_status = "ok"
+    if db_status == "disconnected" or es_status == "offline" or ollama_status == "offline":
+        general_status = "degraded"
+
+    return {
+        "status": general_status,
+        "project": settings.PROJECT_NAME,
+        "services": {
+            "database": {
+                "status": db_status
+            },
+            "elasticsearch": {
+                "status": es_status
+            },
+            "ollama": {
+                "status": ollama_status,
+                "model": settings.OLLAMA_MODEL,
+                "available_models": available_models
+            },
+            "celery": {
+                "status": celery_status
+            }
+        }
+    }
+
 
 # Global/lazy instance of the plagiarism matching engine
 matcher_instance = None
@@ -98,6 +266,71 @@ def get_matcher():
         matcher_instance = DualTierMatcher()
     return matcher_instance
 
+async def check_service_port_open(host_str: str, port_val: int) -> bool:
+    import socket
+    import anyio
+    def check_sync():
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.2)
+                target = "127.0.0.1" if host_str.lower() == "localhost" else host_str
+                return s.connect_ex((target, port_val)) == 0
+        except Exception:
+            return False
+    return await anyio.to_thread.run_sync(check_sync)
+
+async def check_postgres_online():
+    from urllib.parse import urlparse
+    db_host = settings.POSTGRES_HOST
+    db_port = int(settings.POSTGRES_PORT or 5432)
+    db_url = os.environ.get("DATABASE_URL") or settings.DATABASE_URL
+    if db_url:
+        try:
+            parsed = urlparse(db_url)
+            if parsed.hostname: db_host = parsed.hostname
+            if parsed.port: db_port = parsed.port
+        except Exception:
+            pass
+    if not await check_service_port_open(db_host, db_port):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="PostgreSQL database service is offline. Please start the PostgreSQL Docker container (run: docker compose up -d)."
+        )
+
+async def check_elasticsearch_online():
+    from urllib.parse import urlparse
+    es_host = "localhost"
+    es_port = 9200
+    if settings.ELASTICSEARCH_URL:
+        try:
+            parsed = urlparse(settings.ELASTICSEARCH_URL)
+            if parsed.hostname: es_host = parsed.hostname
+            if parsed.port: es_port = parsed.port
+        except Exception:
+            pass
+    if not await check_service_port_open(es_host, es_port):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Elasticsearch service is offline. Please start the Elasticsearch Docker container (run: docker compose up -d)."
+        )
+
+async def check_ollama_online():
+    from urllib.parse import urlparse
+    ollama_host = "127.0.0.1"
+    ollama_port = 11434
+    if settings.OLLAMA_URL:
+        try:
+            parsed = urlparse(settings.OLLAMA_URL)
+            if parsed.hostname: ollama_host = parsed.hostname
+            if parsed.port: ollama_port = parsed.port
+        except Exception:
+            pass
+    if not await check_service_port_open(ollama_host, ollama_port):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Ollama service is offline. Please make sure Ollama is running locally on your system."
+        )
+
 @app.post(
     f"{settings.API_V1_STR}/documents/upload",
     response_model=DocumentUploadResponse,
@@ -106,6 +339,9 @@ def get_matcher():
     description="Ingests a PDF, DOCX, or TXT file, validates constraints, extracts plain text, and segments it."
 )
 async def upload_document(file: UploadFile = File(...)):
+    await check_postgres_online()
+    await check_elasticsearch_online()
+
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -152,6 +388,9 @@ async def upload_document(file: UploadFile = File(...)):
     include_in_schema=False
 )
 async def analyze_document_async(file: UploadFile = File(...)):
+    await check_postgres_online()
+    await check_elasticsearch_online()
+
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -313,6 +552,7 @@ async def get_job_report_pdf(job_id: str):
     include_in_schema=False
 )
 async def rewrite_text_endpoint(payload: RewriteRequest):
+    await check_ollama_online()
     rewritten = await LLMService.rewrite_text(payload.text, tone=payload.tone)
     return RewriteResponse(
         original_text=payload.text,
