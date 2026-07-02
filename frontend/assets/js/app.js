@@ -1129,7 +1129,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!overlay) {
             overlay = document.createElement("div");
             overlay.className = "sidebar-overlay";
-            document.body.appendChild(overlay);
+            sidebarPanel.parentNode.appendChild(overlay);
         }
 
         menuToggleBtn.addEventListener("click", (e) => {
