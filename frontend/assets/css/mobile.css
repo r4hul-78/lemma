@@ -26,11 +26,12 @@ body {
         position: fixed;
         top: 0;
         left: -280px; /* Hidden offscreen by default */
-        border-right: 1px solid var(--border-color);
+        border-right: 1px solid var(--border-glass);
         border-top: none;
         z-index: 1000;
-        background-color: var(--bg-secondary);
-        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.7);
+        background-color: var(--surface-glass);
+        backdrop-filter: blur(25px); /* Increased blur on mobile for frosted isolation */
+        box-shadow: 10px 0 30px var(--shadow-glass);
         transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         display: flex;
         flex-direction: column;
@@ -147,8 +148,8 @@ body {
         width: 100%;
         height: auto;
         padding: 1rem;
-        background-color: var(--bg-secondary);
-        border-top: 1px solid var(--border-color);
+        background-color: var(--surface-glass);
+        border-top: 1px solid var(--border-glass);
         box-sizing: border-box;
     }
 

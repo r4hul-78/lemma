@@ -3,6 +3,7 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
+    let isLightTheme = document.documentElement.getAttribute("data-theme") === "light";
     /* -------------------------------------------------------------
      * 1. Dynamic Typewriter Animation
      * ------------------------------------------------------------- */
@@ -365,12 +366,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
                         // Color selection: blend cyan/blue/purple
                         const gradient = ctx.createLinearGradient(p1.sx, p1.sy, p2.sx, p2.sy);
-                        if (p1.colorShift > 0.5) {
-                            gradient.addColorStop(0, `rgba(139, 92, 246, ${finalAlpha})`); // purple
-                            gradient.addColorStop(1, `rgba(59, 130, 246, ${finalAlpha})`); // blue
+                        if (isLightTheme) {
+                            if (p1.colorShift > 0.5) {
+                                gradient.addColorStop(0, `rgba(109, 40, 217, ${finalAlpha * 1.5})`); // deeper purple
+                                gradient.addColorStop(1, `rgba(37, 99, 235, ${finalAlpha * 1.5})`);  // deeper blue
+                            } else {
+                                gradient.addColorStop(0, `rgba(37, 99, 235, ${finalAlpha * 1.5})`);  // deeper blue
+                                gradient.addColorStop(1, `rgba(5, 150, 105, ${finalAlpha * 1.5})`);  // deeper emerald
+                            }
                         } else {
-                            gradient.addColorStop(0, `rgba(59, 130, 246, ${finalAlpha})`);  // blue
-                            gradient.addColorStop(1, `rgba(16, 185, 129, ${finalAlpha})`); // green/emerald
+                            if (p1.colorShift > 0.5) {
+                                gradient.addColorStop(0, `rgba(139, 92, 246, ${finalAlpha})`); // purple
+                                gradient.addColorStop(1, `rgba(59, 130, 246, ${finalAlpha})`); // blue
+                            } else {
+                                gradient.addColorStop(0, `rgba(59, 130, 246, ${finalAlpha})`);  // blue
+                                gradient.addColorStop(1, `rgba(16, 185, 129, ${finalAlpha})`); // green/emerald
+                            }
                         }
 
                         ctx.strokeStyle = gradient;
@@ -392,12 +403,22 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.arc(p.sx, p.sy, size > 0.2 ? size : 0.2, 0, 2 * Math.PI);
 
             // Set color based on index division
-            if (p.colorShift > 0.6) {
-                ctx.fillStyle = `rgba(139, 92, 246, ${alpha})`; // Stark Purple
-            } else if (p.colorShift > 0.3) {
-                ctx.fillStyle = `rgba(59, 130, 246, ${alpha})`;  // Electric Blue
+            if (isLightTheme) {
+                if (p.colorShift > 0.6) {
+                    ctx.fillStyle = `rgba(109, 40, 217, ${alpha})`; // Stark Purple
+                } else if (p.colorShift > 0.3) {
+                    ctx.fillStyle = `rgba(37, 99, 235, ${alpha})`;  // Electric Blue
+                } else {
+                    ctx.fillStyle = `rgba(5, 150, 105, ${alpha})`;  // Mint Emerald
+                }
             } else {
-                ctx.fillStyle = `rgba(16, 185, 129, ${alpha})`;  // Mint Emerald
+                if (p.colorShift > 0.6) {
+                    ctx.fillStyle = `rgba(139, 92, 246, ${alpha})`; // Stark Purple
+                } else if (p.colorShift > 0.3) {
+                    ctx.fillStyle = `rgba(59, 130, 246, ${alpha})`;  // Electric Blue
+                } else {
+                    ctx.fillStyle = `rgba(16, 185, 129, ${alpha})`;  // Mint Emerald
+                }
             }
 
             ctx.fill();
@@ -406,9 +427,15 @@ document.addEventListener("DOMContentLoaded", () => {
             if (p.z < -sphereRadius * 0.7) {
                 ctx.beginPath();
                 ctx.arc(p.sx, p.sy, size * 2.5, 0, 2 * Math.PI);
-                ctx.fillStyle = p.colorShift > 0.6
-                    ? `rgba(139, 92, 246, ${alpha * 0.15})`
-                    : `rgba(59, 130, 246, ${alpha * 0.15})`;
+                if (isLightTheme) {
+                    ctx.fillStyle = p.colorShift > 0.6
+                        ? `rgba(109, 40, 217, ${alpha * 0.15})`
+                        : `rgba(37, 99, 235, ${alpha * 0.15})`;
+                } else {
+                    ctx.fillStyle = p.colorShift > 0.6
+                        ? `rgba(139, 92, 246, ${alpha * 0.15})`
+                        : `rgba(59, 130, 246, ${alpha * 0.15})`;
+                }
                 ctx.fill();
             }
         }
@@ -434,4 +461,39 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     });
+
+    // Theme Switcher Controller
+    function initThemeSwitcher() {
+        const themeBtn = document.getElementById("theme-toggle-btn");
+        if (!themeBtn) return;
+
+        const sunIcon = themeBtn.querySelector(".sun-icon");
+        const moonIcon = themeBtn.querySelector(".moon-icon");
+
+        function updateIcons(theme) {
+            if (theme === "light") {
+                sunIcon.classList.add("hidden");
+                moonIcon.classList.remove("hidden");
+                isLightTheme = true;
+            } else {
+                sunIcon.classList.remove("hidden");
+                moonIcon.classList.add("hidden");
+                isLightTheme = false;
+            }
+        }
+
+        // Set initial icon states
+        const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
+        updateIcons(currentTheme);
+
+        themeBtn.addEventListener("click", () => {
+            const activeTheme = document.documentElement.getAttribute("data-theme") || "dark";
+            const newTheme = activeTheme === "dark" ? "light" : "dark";
+            
+            document.documentElement.setAttribute("data-theme", newTheme);
+            localStorage.setItem("lemma-theme", newTheme);
+            updateIcons(newTheme);
+        });
+    }
+    initThemeSwitcher();
 });

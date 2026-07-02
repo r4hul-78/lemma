@@ -76,8 +76,43 @@ document.addEventListener("DOMContentLoaded", () => {
             setInterval(checkServerHealth, 10000); // Check health every 10 seconds
         }
     }
-    
+
     initApiConfig();
+
+    // Theme Switcher Controller
+    function initThemeSwitcher() {
+        const themeBtn = document.getElementById("theme-toggle-btn");
+        if (!themeBtn) return;
+
+        const sunIcon = themeBtn.querySelector(".sun-icon");
+        const moonIcon = themeBtn.querySelector(".moon-icon");
+
+        function updateIcons(theme) {
+            if (theme === "light") {
+                sunIcon.classList.add("hidden");
+                moonIcon.classList.remove("hidden");
+            } else {
+                sunIcon.classList.remove("hidden");
+                moonIcon.classList.add("hidden");
+            }
+        }
+
+        // Set initial icon states
+        const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
+        updateIcons(currentTheme);
+
+        themeBtn.addEventListener("click", () => {
+            const activeTheme = document.documentElement.getAttribute("data-theme") || "dark";
+            const newTheme = activeTheme === "dark" ? "light" : "dark";
+
+            document.documentElement.setAttribute("data-theme", newTheme);
+            localStorage.setItem("lemma-theme", newTheme);
+            updateIcons(newTheme);
+
+            showToast(`Switched to ${newTheme === "dark" ? "Dark Mode" : "Light Mode"}`, "info");
+        });
+    }
+    initThemeSwitcher();
 
     /* -------------------------------------------------------------
      * Server Health Checking
@@ -86,15 +121,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const hOllama = document.getElementById("health-ollama");
         const hOllamaDot = document.getElementById("health-ollama-dot");
         const hOllamaText = document.getElementById("health-ollama-text");
-        
+
         const hEs = document.getElementById("health-es");
         const hEsDot = document.getElementById("health-es-dot");
         const hEsText = document.getElementById("health-es-text");
-        
+
         const hDb = document.getElementById("health-db");
         const hDbDot = document.getElementById("health-db-dot");
         const hDbText = document.getElementById("health-db-text");
-        
+
         const hCelery = document.getElementById("health-celery");
         const hCeleryDot = document.getElementById("health-celery-dot");
         const hCeleryText = document.getElementById("health-celery-text");
@@ -123,7 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (response.ok) {
                 const healthData = await response.json();
                 const services = healthData.services || {};
-                
+
                 // 1. Ollama status
                 const ollama = services.ollama || {};
                 if (ollama.status === "running") {
@@ -136,7 +171,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     hOllama.className = "health-item offline-red";
                     hOllamaText.textContent = "Offline";
                 }
-                
+
                 // 2. Elasticsearch status
                 const es = services.elasticsearch || {};
                 if (es.status === "healthy") {
@@ -149,7 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     hEs.className = "health-item offline-red";
                     hEsText.textContent = "Offline";
                 }
-                
+
                 // 3. PostgreSQL Database status
                 const db = services.database || {};
                 if (db.status === "connected") {
@@ -159,7 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     hDb.className = "health-item offline-red";
                     hDbText.textContent = "Offline";
                 }
-                
+
                 // 4. Celery Queue status (Idle vs Working)
                 const celery = services.celery || {};
                 const isFrontendRunningJob = (currentJobId !== null && uploadResponseData === null);
@@ -191,7 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function showToast(message, type = "info") {
         const toast = document.createElement("div");
         toast.className = `toast toast-${type}`;
-        
+
         let icon = '<i class="fa-solid fa-circle-info"></i>';
         if (type === "error") icon = '<i class="fa-solid fa-circle-exclamation"></i>';
         if (type === "success") icon = '<i class="fa-solid fa-circle-check"></i>';
@@ -200,7 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ${icon}
             <div class="toast-message">${message}</div>
         `;
-        
+
         toastContainer.appendChild(toast);
 
         // Slide out and remove
@@ -271,7 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (progressCircle) {
             progressCircle.style.background = `conic-gradient(var(--border-color) 360deg, transparent 0deg)`;
         }
-        
+
         document.getElementById("legend-val-lexical").textContent = "0%";
         document.getElementById("legend-val-hybrid").textContent = "0%";
         document.getElementById("legend-val-semantic").textContent = "0%";
@@ -287,10 +322,10 @@ document.addEventListener("DOMContentLoaded", () => {
         // Update Metadata sidebar indicators
         metaFilename.textContent = file.name;
         metaStatus.innerHTML = '<span class="badge badge-dim">Uploading...</span>';
-        
+
         // Show loading progress
         showToast(`Uploading ${file.name}...`, "info");
-        
+
         const formData = new FormData();
         formData.append("file", file);
 
@@ -308,10 +343,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             uploadResponseData = data;
             showToast("Document uploaded and segmented successfully.", "success");
-            
+
             // Render Document Viewer (plain text)
             renderDocument(uploadResponseData);
-            
+
             // Reset metrics cards in UI
             resetMetricsUI();
 
@@ -319,11 +354,11 @@ document.addEventListener("DOMContentLoaded", () => {
             btnRunAnalysis.disabled = false;
             btnDownloadPdf.classList.add("hidden");
             metaStatus.innerHTML = '<span class="badge badge-dim">Uploaded</span>';
-            
+
         } catch (error) {
             console.error("Upload Error:", error);
             showToast(error.message, "error");
-            
+
             // Reset metadata card on failure
             metaFilename.textContent = "No file uploaded";
             metaStatus.innerHTML = '<span class="badge badge-dim">Idle</span>';
@@ -351,7 +386,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Mark that a job is actively running to update the health footer to Working
         isAnalyzing = true;
         checkServerHealth();
-        
+
         const formData = new FormData();
         formData.append("file", file);
 
@@ -369,7 +404,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const jobId = data.job_id;
             currentJobId = jobId;
-            
+
             // Start polling the job status
             pollAnalysisStatus(jobId, file.name);
 
@@ -394,18 +429,18 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 const response = await fetch(`${API_STATUS_URL}/${jobId}`);
                 const data = await response.json();
-                
+
                 if (!response.ok) {
                     throw new Error(data.detail || "Status check failed");
                 }
-                
+
                 if (data.status === "completed") {
                     clearInterval(interval);
                     isAnalyzing = false;
                     checkServerHealth();
-                    
+
                     uploadResponseData = data.result;
-                    
+
                     showToast("Document analysis complete!", "success");
                     metaStatus.innerHTML = '<span class="badge badge-dim">Analyzed</span>';
 
@@ -429,13 +464,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     // Set circular progress middle text
                     const realPlagScore = pctL + pctH + pctS;
                     progressScore.textContent = `${realPlagScore}%`;
-                    
+
                     // Set conic gradient
                     const degL = pctL * 3.6;
                     const degH = pctH * 3.6;
                     const degS = pctS * 3.6;
                     progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #f59e0b ${degL}deg ${degL + degH}deg, #8b5cf6 ${degL + degH}deg ${degL + degH + degS}deg, #10b981 ${degL + degH + degS}deg 360deg)`;
-                    
+
                     // Update Legend Values
                     document.getElementById("legend-val-lexical").textContent = `${pctL}%`;
                     document.getElementById("legend-val-hybrid").textContent = `${pctH}%`;
@@ -444,7 +479,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     // Apply visual highlights to document sentences
                     applyPlagiarismHighlights(analysis);
-                    
+
                     // Show Download PDF button
                     btnDownloadPdf.classList.remove("hidden");
 
@@ -478,10 +513,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 clearInterval(interval);
                 isAnalyzing = false;
                 checkServerHealth();
-                
+
                 console.error("Polling Error:", error);
                 showToast(error.message, "error");
-                
+
                 metaStatus.innerHTML = '<span class="badge badge-dim">Failed</span>';
                 btnRunAnalysis.disabled = false;
                 resetMetricsUI();
@@ -497,7 +532,7 @@ document.addEventListener("DOMContentLoaded", () => {
         viewerFilename.textContent = data.filename;
         const fileExt = data.filename.split(".").pop().toUpperCase();
         viewerDocType.textContent = fileExt;
-        
+
         metaChars.textContent = data.char_count.toLocaleString();
         metaSentences.textContent = data.sentence_count.toLocaleString();
         metaStatus.innerHTML = '<span class="badge badge-dim">Segmented</span>';
@@ -601,12 +636,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if (matchSourceBlock) {
                 matchSourceBlock.classList.remove("hidden");
             }
-            
+
             const matchTypeBadge = document.getElementById("inspect-match-type");
             const matchScoreBadge = document.getElementById("inspect-match-score");
             const matchTitle = document.getElementById("inspect-match-title");
             const matchCitation = document.getElementById("inspect-match-citation");
-            
+
             // Set Match Type Badge
             if (matchData.match_type === "lexical") {
                 matchTypeBadge.className = "badge badge-red";
@@ -618,15 +653,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 matchTypeBadge.className = "badge badge-purple";
                 matchTypeBadge.textContent = "Semantic Match";
             }
-            
+
             // Set Match Score
             const pct = Math.round(matchData.score * 100);
             matchScoreBadge.textContent = `${pct}% Similarity`;
             matchScoreBadge.className = "badge " + (
-                matchData.match_type === "lexical" ? "badge-red" : 
-                (matchData.match_type === "hybrid" ? "badge-orange" : "badge-purple")
+                matchData.match_type === "lexical" ? "badge-red" :
+                    (matchData.match_type === "hybrid" ? "badge-orange" : "badge-purple")
             );
-            
+
             // Set reference sentence and doc info
             inspectMatchRefText.textContent = `"${matchData.matched_sentence.text}"`;
             matchTitle.textContent = matchData.matched_sentence.doc_title;
@@ -643,16 +678,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (isOriginal) {
                 matchDetailsDiv.classList.remove("hidden");
-                
+
                 const matchTypeBadge = document.getElementById("inspect-match-type");
                 const matchScoreBadge = document.getElementById("inspect-match-score");
-                
+
                 matchTypeBadge.className = "badge badge-green";
                 matchTypeBadge.textContent = "Original Segment";
-                
+
                 matchScoreBadge.className = "badge badge-green";
                 matchScoreBadge.textContent = "0% Similarity";
-                
+
                 if (matchSourceBlock) {
                     matchSourceBlock.classList.add("hidden");
                 }
@@ -682,7 +717,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (match) {
                 const text = span.textContent;
-                
+
                 span.classList.add("plagiarized");
                 if (match.match_type === "lexical") {
                     span.classList.add("match-lexical");
@@ -709,8 +744,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (hl.start > lastIdx) {
                             htmlContent += escapeHtml(text.substring(lastIdx, hl.start));
                         }
-                        const markClass = match.match_type === "lexical" ? "mark-lexical" : 
-                                          (match.match_type === "hybrid" ? "mark-hybrid" : "mark-semantic");
+                        const markClass = match.match_type === "lexical" ? "mark-lexical" :
+                            (match.match_type === "hybrid" ? "mark-hybrid" : "mark-semantic");
                         htmlContent += `<mark class="${markClass}">${escapeHtml(text.substring(hl.start, hl.end))}</mark>`;
                         lastIdx = hl.end;
                     });
@@ -721,8 +756,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     span.innerHTML = htmlContent;
                 } else {
-                    const markClass = match.match_type === "lexical" ? "mark-lexical" : 
-                                      (match.match_type === "hybrid" ? "mark-hybrid" : "mark-semantic");
+                    const markClass = match.match_type === "lexical" ? "mark-lexical" :
+                        (match.match_type === "hybrid" ? "mark-hybrid" : "mark-semantic");
                     span.innerHTML = `<mark class="${markClass}">${escapeHtml(text)}</mark>`;
                 }
             } else {
@@ -747,13 +782,13 @@ document.addEventListener("DOMContentLoaded", () => {
         documentViewer.classList.add("hidden");
         dropZone.classList.remove("hidden");
         fileInput.value = ""; // clear input stream
-        
+
         // Reset Metadata stats
         metaChars.textContent = "-";
         metaSentences.textContent = "-";
         metaFilename.textContent = "No file uploaded";
         metaStatus.innerHTML = '<span class="badge badge-dim">Idle</span>';
-        
+
         // Reset Inspector state
         inspectorPlaceholder.classList.remove("hidden");
         inspectorData.classList.add("hidden");
@@ -775,7 +810,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         progressScore.textContent = "0%";
         progressCircle.style.background = "conic-gradient(var(--border-color) 360deg, transparent 0deg)";
-        
+
         lexicalChk.innerHTML = '<i class="fa-regular fa-circle"></i> Lexical Matching (TF-IDF)';
         lexicalChk.className = "checklist-item";
         semanticChk.innerHTML = '<i class="fa-regular fa-circle"></i> Semantic Indexing (Embeddings)';
@@ -854,7 +889,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const paraphraseBlock = document.getElementById("paraphrase-result-block");
         const paraphraseText = document.getElementById("inspect-paraphrase-text");
-        
+
         // Disable button and show spinner
         btnQuickParaphrase.disabled = true;
         btnQuickParaphrase.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Paraphrasing...';
@@ -918,11 +953,11 @@ document.addEventListener("DOMContentLoaded", () => {
     navItems.forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
-            
+
             // Deactivate all nav items
             navItems.forEach(n => n.classList.remove("active"));
             item.classList.add("active");
-            
+
             // Close mobile sidebar drawer if it was opened
             const sidebar = document.getElementById("sidebar-panel");
             const overlay = document.querySelector(".sidebar-overlay");
@@ -930,10 +965,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 sidebar.classList.remove("open");
                 if (overlay) overlay.classList.remove("active");
             }
-            
+
             const tabId = item.id;
             hideAllWorkspaces();
-            
+
             if (tabId === "nav-dashboard") {
                 if (dashboardHomeView) dashboardHomeView.classList.remove("hidden");
             } else if (tabId === "nav-aichat") {
@@ -950,12 +985,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     const pTitle = document.getElementById("placeholder-title");
                     const pDesc = document.getElementById("placeholder-desc");
                     const pSprint = document.getElementById("placeholder-sprint");
-                    
+
                     let title = "Workspace Section";
                     let iconClass = "fa-folder-open";
                     let desc = "This module is currently queued for expansion in a future development sprint.";
                     let sprint = "Sprint 2";
-                    
+
                     if (tabId === "nav-projects") {
                         title = "My Projects";
                         iconClass = "fa-folder-open";
@@ -997,12 +1032,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         desc = "Troubleshoot local engine setups (Ollama, PostgreSQL, Elasticsearch) and read keyboard shortcuts guides.";
                         sprint = "Sprint 1";
                     }
-                    
+
                     if (pIcon) pIcon.className = `fa-solid ${iconClass}`;
                     if (pTitle) pTitle.textContent = title;
                     if (pDesc) pDesc.textContent = desc;
                     if (pSprint) pSprint.textContent = sprint;
-                    
+
                     placeholderWorkspace.classList.remove("hidden");
                 }
             }
@@ -1052,7 +1087,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 showToast("Please enter a research question or rewrite draft.", "error");
                 return;
             }
-            
+
             // Swap to AI Chat (Paraphraser) tab
             const aichatNav = document.getElementById("nav-aichat");
             if (aichatNav) {
@@ -1062,7 +1097,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     paraInput.dispatchEvent(new Event("input"));
                 }
                 aichatNav.click();
-                
+
                 // Automatically trigger paraphrase run
                 const btnRunPara = document.getElementById("btn-run-paraphrase");
                 if (btnRunPara) btnRunPara.click();
@@ -1079,10 +1114,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (fileInput) fileInput.click();
         }
     };
-    
+
     const btnUploadNewDash = document.getElementById("btn-upload-new-dash");
     if (btnUploadNewDash) btnUploadNewDash.addEventListener("click", redirectAndIngest);
-    
+
     const btnQuickNew = document.getElementById("btn-quick-new");
     if (btnQuickNew) btnQuickNew.addEventListener("click", redirectAndIngest);
 
@@ -1096,13 +1131,13 @@ document.addEventListener("DOMContentLoaded", () => {
             overlay.className = "sidebar-overlay";
             document.body.appendChild(overlay);
         }
-        
+
         menuToggleBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             sidebarPanel.classList.toggle("open");
             overlay.classList.toggle("active");
         });
-        
+
         overlay.addEventListener("click", () => {
             sidebarPanel.classList.remove("open");
             overlay.classList.remove("active");
@@ -1151,7 +1186,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     text: textToParaphrase,
                     tone: paraTone.value
                 })
@@ -1165,14 +1200,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Render result
             paraOutputRender.innerHTML = escapeHtml(data.rewritten_text);
-            
+
             // Calculate new word count
             const wordsNew = data.rewritten_text.trim().split(/\s+/).length;
             paraNewWords.textContent = wordsNew;
 
             // Enable copy button
             btnCopyParaphrase.disabled = false;
-            
+
             showToast("Text paraphrased successfully!", "success");
         } catch (error) {
             console.error("Paraphrase Workspace Error:", error);
@@ -1205,11 +1240,11 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             let history = localStorage.getItem("lemma_reports_history");
             history = history ? JSON.parse(history) : [];
-            
+
             // Check if this jobId already exists in history to prevent duplicates
             const exists = history.some(item => item.jobId === jobId);
             if (exists) return;
-            
+
             const newReport = {
                 filename: filename,
                 jobId: jobId,
@@ -1217,14 +1252,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 score: scorePct,
                 result: resultData
             };
-            
+
             history.unshift(newReport); // Add to the beginning
-            
+
             // Limit history to 20 entries
             if (history.length > 20) {
                 history.pop();
             }
-            
+
             localStorage.setItem("lemma_reports_history", JSON.stringify(history));
         } catch (e) {
             console.error("Error saving report to history:", e);
@@ -1235,23 +1270,23 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             let history = localStorage.getItem("lemma_reports_history");
             history = history ? JSON.parse(history) : [];
-            
+
             reportsTableBody.innerHTML = "";
-            
+
             if (history.length === 0) {
                 reportsTable.classList.add("hidden");
                 reportsEmptyState.classList.remove("hidden");
                 btnClearHistory.disabled = true;
                 return;
             }
-            
+
             reportsTable.classList.remove("hidden");
             reportsEmptyState.classList.add("hidden");
             btnClearHistory.disabled = false;
-            
+
             history.forEach((item, index) => {
                 const tr = document.createElement("tr");
-                
+
                 // Get similarity badge class
                 let scoreBadgeClass = "badge-green";
                 if (item.score > 50) {
@@ -1259,7 +1294,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else if (item.score > 20) {
                     scoreBadgeClass = "badge-purple";
                 }
-                
+
                 tr.innerHTML = `
                     <td>
                         <i class="fa-solid fa-file-invoice" style="margin-right: 8px; color: var(--text-muted);"></i>
@@ -1283,7 +1318,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 `;
                 reportsTableBody.appendChild(tr);
             });
-            
+
             // Bind view/restore clicks
             document.querySelectorAll(".btn-restore-report").forEach(btn => {
                 btn.addEventListener("click", () => {
@@ -1294,7 +1329,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 });
             });
-            
+
             // Bind download pdf clicks
             document.querySelectorAll(".btn-download-report-pdf").forEach(btn => {
                 btn.addEventListener("click", () => {
@@ -1313,13 +1348,13 @@ document.addEventListener("DOMContentLoaded", () => {
         uploadResponseData = reportItem.result;
         currentJobId = reportItem.jobId;
         activeFile = { name: reportItem.filename }; // mock active file
-        
+
         // Render document text structures
         renderDocument(uploadResponseData);
-        
+
         // Enable PDF download button
         btnDownloadPdf.classList.remove("hidden");
-        
+
         // Immediately run analysis rendering in UI (without delay since it's already computed)
         const analysis = uploadResponseData.analysis;
         const lexicalChk = document.getElementById("chk-lexical");
@@ -1331,7 +1366,7 @@ document.addEventListener("DOMContentLoaded", () => {
         lexicalChk.className = "checklist-item done";
         semanticChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Semantic Matching Complete';
         semanticChk.className = "checklist-item done";
-        
+
         const total = analysis.total_sentences;
         const lexicalCount = analysis.lexical_matches_count;
         const hybridCount = analysis.hybrid_matches_count || 0;
@@ -1341,15 +1376,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const pctH = total > 0 ? Math.round((hybridCount / total) * 100) : 0;
         const pctS = total > 0 ? Math.round((semanticCount / total) * 100) : 0;
         const pctO = Math.max(0, 100 - pctL - pctH - pctS);
-        
+
         const realPlagScore = pctL + pctH + pctS;
         progressScore.textContent = `${realPlagScore}%`;
-        
+
         const degL = pctL * 3.6;
         const degH = pctH * 3.6;
         const degS = pctS * 3.6;
         progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #f59e0b ${degL}deg ${degL + degH}deg, #8b5cf6 ${degL + degH}deg ${degL + degH + degS}deg, #10b981 ${degL + degH + degS}deg 360deg)`;
-        
+
         document.getElementById("legend-val-lexical").textContent = `${pctL}%`;
         document.getElementById("legend-val-hybrid").textContent = `${pctH}%`;
         document.getElementById("legend-val-semantic").textContent = `${pctS}%`;
@@ -1357,15 +1392,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         applyPlagiarismHighlights(analysis);
         btnRunAnalysis.disabled = false;
-        
+
         // Switch view to Plagiarism Check
         navItems.forEach(n => n.classList.remove("active"));
         const plagNav = document.getElementById("nav-plagiarism");
         if (plagNav) plagNav.classList.add("active");
-        
+
         hideAllWorkspaces();
         if (dashboardWorkspace) dashboardWorkspace.classList.remove("hidden");
-        
+
         showToast(`Loaded analysis report for ${reportItem.filename}`, "success");
     }
 

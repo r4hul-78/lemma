@@ -1,7 +1,7 @@
 /* -------------------------------------------------------------
  * Lemma Design Tokens & CSS Variables
  * ------------------------------------------------------------- */
-:root {
+:root, html[data-theme="dark"] {
     --bg-primary: #000000;
     --bg-secondary: #0a0a0c;
     --bg-tertiary: #121215;
@@ -24,6 +24,65 @@
     
     --transition-fast: 0.15s ease;
     --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Glassmorphism custom tokens */
+    --surface-glass: rgba(10, 10, 12, 0.45);
+    --border-glass: rgba(255, 255, 255, 0.08);
+    --shadow-glass: rgba(0, 0, 0, 0.5);
+    --card-bg-glass: rgba(18, 18, 21, 0.6);
+    --fog-opacity: 0.35;
+    
+    /* Secondary element hover/active colors */
+    --nav-hover: rgba(255, 255, 255, 0.03);
+    --nav-active: rgba(255, 255, 255, 0.06);
+    --nav-active-border: rgba(255, 255, 255, 0.08);
+    
+    /* Code/sentence selection overlays */
+    --sentence-hover: rgba(255, 255, 255, 0.04);
+    --sentence-active: rgba(255, 255, 255, 0.08);
+
+    /* Scrollbar track & handle */
+    --scrollbar-track: rgba(255, 255, 255, 0.02);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+}
+
+html[data-theme="light"] {
+    --bg-primary: #FAF9F6; /* Soft Alabaster off-white background */
+    --bg-secondary: #FCFBF7; /* Subtle Ivory base panels */
+    --bg-tertiary: #F5F5F0; /* Lighter Muted Bone utility background */
+    
+    --text-primary: #1E2229; /* Warm Charcoal text for comfortable reading */
+    --text-secondary: #505663; /* Muted Slate for subtext */
+    --text-muted: #8F949F; /* Desaturated Slate for labels */
+    
+    --accent-blue: #2563eb; /* Slightly deeper blue for light contrast */
+    --accent-purple: #059669; /* Slightly deeper emerald green */
+    --accent-purple-glow: rgba(5, 150, 105, 0.12);
+    --accent-purple-glow-heavy: rgba(5, 150, 105, 0.3);
+    
+    --border-color: #E8E6E0; /* Warm Sage Gray borders */
+    --border-color-focus: #D6D3CB; /* Frosted Pebble for focus boundaries */
+    --border-glow: rgba(30, 34, 41, 0.03);
+
+    /* Glassmorphism custom tokens */
+    --surface-glass: rgba(252, 251, 247, 0.65); /* Frosted ivory glass */
+    --border-glass: rgba(232, 230, 224, 0.4); /* Frosted warm-sage-gray border */
+    --shadow-glass: rgba(30, 34, 41, 0.06); /* Soft warm-charcoal dropshadow */
+    --card-bg-glass: rgba(245, 245, 240, 0.7); /* Frosted muted-bone card background */
+    --fog-opacity: 0.15; /* Desaturated/subtle fog opacity */
+    
+    /* Secondary element hover/active colors */
+    --nav-hover: rgba(30, 34, 41, 0.03);
+    --nav-active: rgba(30, 34, 41, 0.04);
+    --nav-active-border: rgba(30, 34, 41, 0.06);
+    
+    /* Code/sentence selection overlays */
+    --sentence-hover: rgba(30, 34, 41, 0.02);
+    --sentence-active: rgba(30, 34, 41, 0.04);
+
+    /* Scrollbar track & handle */
+    --scrollbar-track: rgba(30, 34, 41, 0.02);
+    --scrollbar-thumb: rgba(30, 34, 41, 0.1);
 }
 
 /* -------------------------------------------------------------
@@ -57,8 +116,10 @@ body {
     filter: blur(120px);
     z-index: 0;
     pointer-events: none;
-    opacity: 0.35;
+    opacity: var(--fog-opacity);
     transition: all 5s ease-in-out;
+    will-change: transform, opacity;
+    backface-visibility: hidden;
 }
 
 .fog-1 {
@@ -102,13 +163,15 @@ body {
 /* Sidebar Navigation */
 .sidebar {
     width: 280px;
-    background-color: var(--bg-secondary);
-    border-right: 1px solid var(--border-color);
+    background-color: var(--surface-glass);
+    border-right: 1px solid var(--border-glass);
     display: flex;
     flex-direction: column;
     padding: 2rem 1.5rem;
     flex-shrink: 0;
     backdrop-filter: blur(20px);
+    will-change: transform, opacity;
+    backface-visibility: hidden;
 }
 
 .sidebar-brand {
@@ -169,14 +232,14 @@ body {
 
 .nav-item a:hover {
     color: var(--text-primary);
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: var(--nav-hover);
 }
 
 .nav-item.active a {
     color: var(--text-primary);
-    background-color: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.02);
+    background-color: var(--nav-active);
+    border: 1px solid var(--nav-active-border);
+    box-shadow: 0 4px 20px var(--shadow-glass), inset 0 0 10px var(--border-glow);
 }
 
 .sidebar-footer {
@@ -317,14 +380,15 @@ body {
 
 /* Panel Defaults */
 .panel {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background-color: var(--surface-glass);
+    border: 1px solid var(--border-glass);
     border-radius: var(--card-radius);
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 32px var(--shadow-glass);
     backdrop-filter: blur(20px);
+    will-change: transform, opacity;
 }
 
 .left-panel {
@@ -449,7 +513,7 @@ body {
     padding-right: 0.5rem;
     font-size: 1rem;
     line-height: 1.75;
-    color: #e4e4e7;
+    color: var(--text-primary);
     position: relative;
     max-height: 480px;
 }
@@ -459,10 +523,10 @@ body {
     width: 6px;
 }
 .viewer-scroller::-webkit-scrollbar-track, .main-content::-webkit-scrollbar-track {
-    background: transparent;
+    background: var(--scrollbar-track);
 }
 .viewer-scroller::-webkit-scrollbar-thumb, .main-content::-webkit-scrollbar-thumb {
-    background: var(--border-color);
+    background: var(--scrollbar-thumb);
     border-radius: 3px;
 }
 .viewer-scroller::-webkit-scrollbar-thumb:hover, .main-content::-webkit-scrollbar-thumb:hover {
@@ -736,13 +800,13 @@ body {
 }
 
 .btn-secondary {
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: var(--nav-hover);
     border-color: var(--border-color);
     color: var(--text-primary);
 }
 
 .btn-secondary:hover:not(:disabled) {
-    background-color: rgba(255, 255, 255, 0.08);
+    background-color: var(--nav-active);
 }
 
 .btn-outline {
@@ -778,7 +842,7 @@ body {
 }
 
 .badge-dim {
-    background-color: rgba(255, 255, 255, 0.02);
+    background-color: var(--nav-hover);
     color: var(--text-muted);
     border: 1px solid var(--border-color);
 }
@@ -877,8 +941,8 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 0 4rem;
-    border-bottom: 1px solid var(--border-color);
-    background-color: rgba(0, 0, 0, 0.6);
+    border-bottom: 1px solid var(--border-glass);
+    background-color: var(--surface-glass);
     backdrop-filter: blur(12px);
     position: sticky;
     top: 0;
@@ -957,7 +1021,7 @@ body {
     background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-blue) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    text-shadow: 0 0 40px rgba(139, 92, 246, 0.3);
+    text-shadow: 0 0 40px var(--accent-purple-glow-heavy);
     font-weight: 800;
     display: inline-block;
 }
@@ -1058,12 +1122,12 @@ body {
 .partners-section {
     position: relative;
     z-index: 2;
-    background-color: rgba(10, 10, 12, 0.45);
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: var(--surface-glass);
+    border-top: 1px solid var(--border-glass);
+    border-bottom: 1px solid var(--border-glass);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 30px var(--shadow-glass);
     padding: 3.5rem 2rem;
     text-align: center;
 }
@@ -1173,8 +1237,8 @@ body {
 .landing-footer {
     position: relative;
     z-index: 2;
-    background-color: #000000;
-    border-top: 1px solid var(--border-color);
+    background-color: var(--surface-glass);
+    border-top: 1px solid var(--border-glass);
     padding: 2.5rem 4rem;
     display: flex;
     justify-content: space-between;
@@ -1648,8 +1712,8 @@ mark.mark-hybrid {
     height: 70px;
     padding: 0 0.5rem;
     margin-bottom: 2rem;
-    border-bottom: 1px solid var(--border-color);
-    background-color: rgba(0, 0, 0, 0.5);
+    border-bottom: 1px solid var(--border-glass);
+    background-color: var(--surface-glass);
     backdrop-filter: blur(10px);
     z-index: 10;
 }
@@ -1899,14 +1963,15 @@ mark.mark-hybrid {
 }
 
 .metric-card {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background-color: var(--surface-glass);
+    border: 1px solid var(--border-glass);
     border-radius: var(--card-radius);
     padding: 1.25rem;
     display: flex;
     align-items: center;
     gap: 1.25rem;
     transition: transform var(--transition-normal), border-color var(--transition-normal);
+    box-shadow: 0 4px 20px var(--shadow-glass);
 }
 
 .metric-card:hover {
@@ -2236,8 +2301,8 @@ mark.mark-hybrid {
 }
 
 .project-stack-item {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background-color: var(--surface-glass);
+    border: 1px solid var(--border-glass);
     border-radius: var(--card-radius);
     padding: 0.85rem 1rem;
     display: flex;
@@ -2245,11 +2310,12 @@ mark.mark-hybrid {
     justify-content: space-between;
     text-decoration: none;
     transition: var(--transition-fast);
+    box-shadow: 0 2px 10px var(--shadow-glass);
 }
 
 .project-stack-item:hover {
     border-color: var(--border-color-focus);
-    background-color: rgba(255, 255, 255, 0.01);
+    background-color: var(--nav-hover);
 }
 
 .project-info {
@@ -2377,14 +2443,15 @@ mark.mark-hybrid {
     left: 280px; /* Aligns with sidebar */
     right: 0;
     height: 40px;
-    background-color: var(--bg-secondary);
-    border-top: 1px solid var(--border-color);
+    background-color: var(--surface-glass);
+    border-top: 1px solid var(--border-glass);
     display: flex;
     align-items: center;
     padding: 0 2rem;
     z-index: 99;
     backdrop-filter: blur(15px);
     transition: left var(--transition-normal);
+    will-change: transform;
 }
 
 .health-status-container {
