@@ -4,7 +4,7 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     // API URL configuration
-    let API_BASE_URL = 'https://r4hul-78-lemma-backend.hf.space'; 
+    let API_BASE_URL = 'https://r4hul-78-lemma-backend.hf.space'; -icon
     let API_UPLOAD_URL = `${API_BASE_URL}/api/v1/documents/upload`;
     let API_ANALYZE_URL = `${API_BASE_URL}/api/v1/analyze`;
     let API_STATUS_URL = `${API_BASE_URL}/api/v1/status`;
@@ -107,9 +107,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
             document.documentElement.setAttribute("data-theme", newTheme);
             localStorage.setItem("lemma-theme", newTheme);
-            updateIcons(newTheme);
+            localStorage.setItem("lemma-theme-manual", "true");
 
+            updateIcons(newTheme);
             showToast(`Switched to ${newTheme === "dark" ? "Dark Mode" : "Light Mode"}`, "info");
+        });
+
+        // Setup real-time system theme change listener for all users
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+            const hasManualTheme = localStorage.getItem("lemma-theme-manual");
+            if (!hasManualTheme) {
+                const newTheme = e.matches ? "dark" : "light";
+                document.documentElement.setAttribute("data-theme", newTheme);
+                localStorage.setItem("lemma-theme", newTheme);
+                updateIcons(newTheme);
+                showToast(`System theme shifted to ${newTheme === "dark" ? "Dark Mode" : "Light Mode"}`, "info");
+            }
         });
     }
     initThemeSwitcher();
@@ -1134,13 +1147,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
         menuToggleBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            sidebarPanel.classList.toggle("open");
-            overlay.classList.toggle("active");
+            if (window.innerWidth < 768) {
+                // Mobile: slide-in drawer
+                sidebarPanel.classList.toggle("open");
+                overlay.classList.toggle("active");
+            } else {
+                // Desktop: collapse sidebar margins
+                const appContainer = document.querySelector(".app-container");
+                if (appContainer) {
+                    appContainer.classList.toggle("collapsed");
+                    const isCollapsed = appContainer.classList.contains("collapsed");
+                    localStorage.setItem("lemma-sidebar-state", isCollapsed ? "collapsed" : "expanded");
+                }
+            }
         });
 
         overlay.addEventListener("click", () => {
-            sidebarPanel.classList.remove("open");
-            overlay.classList.remove("active");
+            if (window.innerWidth < 768) {
+                sidebarPanel.classList.remove("open");
+                overlay.classList.remove("active");
+            }
         });
     }
 
@@ -1405,12 +1431,49 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Clear History Action
-    btnClearHistory.addEventListener("click", () => {
-        if (confirm("Are you sure you want to clear your reports history? This cannot be undone.")) {
-            localStorage.removeItem("lemma_reports_history");
-            renderReportsHistory();
-            showToast("Reports history cleared.", "info");
-        }
-    });
+    if (btnClearHistory) {
+        btnClearHistory.addEventListener("click", () => {
+            if (confirm("Are you sure you want to clear your reports history? This cannot be undone.")) {
+                localStorage.removeItem("lemma_reports_history");
+                renderReportsHistory();
+                showToast("Reports history cleared.", "info");
+            }
+        });
+    }
+
+    // Blank Start Page Workspace Event Handlers
+    const blankPromptInput = document.getElementById("blank-prompt-input");
+    if (blankPromptInput) {
+        blankPromptInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                const promptVal = blankPromptInput.value.trim();
+                if (promptVal) {
+                    // Navigate to AI Paraphraser (AI Chat)
+                    const paraInputText = document.getElementById("para-input-text");
+                    if (paraInputText) {
+                        paraInputText.value = promptVal;
+                        paraInputText.dispatchEvent(new Event("input"));
+                    }
+
+                    const navParaphrase = document.getElementById("nav-paraphrase");
+                    if (navParaphrase) {
+                        navParaphrase.click();
+                    }
+
+                    blankPromptInput.value = "";
+                }
+            }
+        });
+    }
+
+    const btnBlankNew = document.getElementById("btn-blank-new");
+    if (btnBlankNew) {
+        btnBlankNew.addEventListener("click", () => {
+            const navPlagiarism = document.getElementById("nav-plagiarism");
+            if (navPlagiarism) {
+                navPlagiarism.click();
+            }
+        });
+    }
 });
 
