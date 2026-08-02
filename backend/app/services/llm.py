@@ -120,3 +120,86 @@ class LLMService:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=f"Ollama service is unavailable at {settings.OLLAMA_URL}. Ensure Ollama is running locally."
             )
+
+    @classmethod
+    async def extract_abstract(cls, text_excerpt: str) -> str:
+        """
+        Use the local Ollama LLM to extract the abstract from document text.
+
+        This is the Tier-2 fallback when regex/heading heuristics fail to
+        locate a clearly labeled abstract section.
+
+        Parameters
+        ----------
+        text_excerpt : str
+            The first ~2000 characters of the document text.
+
+        Returns
+        -------
+        str
+            The extracted abstract text, or empty string on failure.
+        """
+        if not text_excerpt or not text_excerpt.strip():
+            return ""
+
+        # Fetch available models
+        available = await cls.get_available_models()
+        model_to_use = settings.OLLAMA_MODEL
+
+        if available:
+            if model_to_use not in available:
+                candidates = [
+                    m for m in available
+                    if m.startswith(model_to_use) or model_to_use.startswith(m.split(':')[0])
+                ]
+                if candidates:
+                    model_to_use = candidates[0]
+                elif available:
+                    model_to_use = available[0]
+
+        prompt = (
+            "You are an expert academic document parser. "
+            "Extract ONLY the abstract from the following academic paper text. "
+            "Return ONLY the abstract text, nothing else. "
+            "If no abstract is found, return exactly the text: NO_ABSTRACT_FOUND\n\n"
+            f"Document text:\n{text_excerpt}\n\n"
+            "Abstract:"
+        )
+
+        payload = {
+            "model": model_to_use,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.1,
+                "top_p": 0.9,
+                "top_k": 20,
+            },
+        }
+
+        url = f"{settings.OLLAMA_URL.rstrip('/')}/api/generate"
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(url, json=payload)
+                if response.status_code == 200:
+                    data = response.json()
+                    result = data.get("response", "").strip()
+
+                    # Clean up
+                    if result.startswith('"') and result.endswith('"'):
+                        result = result[1:-1].strip()
+                    elif result.startswith("'") and result.endswith("'"):
+                        result = result[1:-1].strip()
+
+                    if "NO_ABSTRACT_FOUND" in result.upper():
+                        return ""
+
+                    return result
+                else:
+                    logger.warning(f"Ollama abstract extraction returned status {response.status_code}")
+                    return ""
+        except Exception as e:
+            logger.warning(f"Failed to extract abstract via Ollama: {e}")
+            return ""
+

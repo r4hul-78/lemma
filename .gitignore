@@ -26,6 +26,9 @@ uploads/
 backend/uploads/
 backend/app/uploads/
 
+# Internal Planning Documents
+FUTURE_ROADMAP.md
+
 # AI Agent Context Files
 lemma/Project Context/
 Project Context

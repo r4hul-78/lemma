@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import io
 import httpx
 import xml.etree.ElementTree as ET
 from collections import Counter
@@ -10,6 +11,10 @@ from app.services.elasticsearch_client import get_es_client, index_sentence_bulk
 from app.services.matcher import SemanticMatcher
 
 logger = logging.getLogger(__name__)
+
+# [DEBUG-SECTION] — To remove: delete this import line
+from app.debug_logger import log_api_call, log_data_exchange
+# [/DEBUG-SECTION]
 
 class OnlineRetrieverService:
     """Manages dynamic query generation, external academic API fetching, and JIT ephemeral caching."""
@@ -114,6 +119,28 @@ class OnlineRetrieverService:
             return []
 
     @classmethod
+    def extract_search_queries_from_profile(cls, profile) -> list[str]:
+        """
+        Generates search queries directly from a TopicProfile object.
+
+        Falls back to profile.search_queries if available, otherwise
+        uses topics and keywords to construct queries.
+        """
+        if profile.search_queries:
+            return profile.search_queries
+
+        queries = []
+        if profile.topics:
+            queries.append(profile.topics[0])
+            if len(profile.topics) >= 2:
+                queries.append(f"{profile.topics[0]} {profile.topics[1]}")
+        if profile.keywords:
+            for kw in profile.keywords:
+                if kw not in queries and len(queries) < 5:
+                    queries.append(kw)
+        return queries[:5]
+
+    @classmethod
     async def fetch_arxiv_candidates(cls, query: str, limit: int = 15) -> list[dict]:
         """Queries the arXiv API for matching academic preprints with retries."""
         url = "https://export.arxiv.org/api/query"
@@ -153,14 +180,28 @@ class OnlineRetrieverService:
                                 if auth.find('atom:name', ns) is not None
                             ]
                             author_str = ", ".join(authors) if authors else "N/A"
+
+                            # Check for PDF link
+                            pdf_url = None
+                            for link in entry.findall('atom:link', ns):
+                                if link.get('title') == 'pdf' or (link.get('type') == 'application/pdf'):
+                                    pdf_url = link.get('href')
+                                    break
+                            if not pdf_url:
+                                # arXiv PDF URL convention
+                                pdf_url = paper_url.replace('/abs/', '/pdf/') + '.pdf'
                             
                             candidates.append({
                                 "doc_id": f"arxiv_{paper_id}",
                                 "title": title,
                                 "author": author_str,
                                 "source": f"arXiv Preprint ({paper_url})",
-                                "text": abstract
+                                "text": abstract,
+                                "pdf_url": pdf_url,
                             })
+                        # [DEBUG-SECTION]
+                        log_api_call("arXiv", url, params=params, response_status=200, result_count=len(candidates))
+                        # [/DEBUG-SECTION]
                         return candidates
                     elif response.status_code == 429:
                         wait_time = backoff * (2 ** attempt)
@@ -181,7 +222,7 @@ class OnlineRetrieverService:
         params = {
             "query": query,
             "limit": limit,
-            "fields": "title,authors,venue,year,abstract"
+            "fields": "title,authors,venue,year,abstract,openAccessPdf"
         }
         
         headers = {}
@@ -214,14 +255,24 @@ class OnlineRetrieverService:
                             
                             venue = paper.get("venue", "Unknown Venue")
                             year = paper.get("year", "N/A")
+
+                            # Check for open-access PDF
+                            pdf_url = None
+                            oa_pdf = paper.get("openAccessPdf")
+                            if oa_pdf and isinstance(oa_pdf, dict):
+                                pdf_url = oa_pdf.get("url")
                             
                             candidates.append({
                                 "doc_id": f"semschol_{paper_id}",
                                 "title": title,
                                 "author": author_str,
                                 "source": f"{venue}, {year}",
-                                "text": abstract
+                                "text": abstract,
+                                "pdf_url": pdf_url,
                             })
+                        # [DEBUG-SECTION]
+                        log_api_call("Semantic Scholar", url, params=params, response_status=200, result_count=len(candidates))
+                        # [/DEBUG-SECTION]
                         return candidates
                     elif response.status_code == 429:
                         if not has_key:
@@ -239,6 +290,183 @@ class OnlineRetrieverService:
         return []
 
     @classmethod
+    async def fetch_crossref_candidates(cls, query: str, limit: int = 15) -> list[dict]:
+        """Queries the Crossref API for matching published works with DOI metadata."""
+        url = "https://api.crossref.org/works"
+        params = {
+            "query": query,
+            "rows": limit,
+            "select": "DOI,title,author,container-title,published-print,abstract",
+        }
+        headers = {
+            "User-Agent": "Lemma/1.0 (mailto:lemma@plagiarism-checker.local)",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                response = await client.get(url, params=params, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    items = data.get("message", {}).get("items", [])
+
+                    candidates = []
+                    for item in items:
+                        doi = item.get("DOI")
+                        titles = item.get("title", [])
+                        title = titles[0] if titles else None
+                        abstract = item.get("abstract", "")
+
+                        if not doi or not title:
+                            continue
+
+                        # Crossref abstracts can contain JATS XML tags – strip them
+                        if abstract:
+                            import re
+                            abstract = re.sub(r"<[^>]+>", "", abstract).strip()
+
+                        if not abstract:
+                            continue
+
+                        authors_raw = item.get("author", [])
+                        author_parts = []
+                        for a in authors_raw:
+                            given = a.get("given", "")
+                            family = a.get("family", "")
+                            if family:
+                                author_parts.append(f"{given} {family}".strip())
+                        author_str = ", ".join(author_parts) if author_parts else "N/A"
+
+                        container = item.get("container-title", [])
+                        venue = container[0] if container else "Unknown Venue"
+                        pub_date = item.get("published-print", {}).get("date-parts", [[]])
+                        year = pub_date[0][0] if pub_date and pub_date[0] else "N/A"
+
+                        candidates.append({
+                            "doc_id": f"crossref_{doi.replace('/', '_')}",
+                            "title": title,
+                            "author": author_str,
+                            "source": f"{venue}, {year} (DOI: {doi})",
+                            "text": abstract,
+                            "pdf_url": None,
+                        })
+                    # [DEBUG-SECTION]
+                    log_api_call("Crossref", url, params=params, response_status=200, result_count=len(candidates))
+                    # [/DEBUG-SECTION]
+                    return candidates
+                else:
+                    logger.warning(f"Crossref API returned status code {response.status_code}")
+                    return []
+        except Exception as e:
+            logger.error(f"Failed to fetch candidates from Crossref for query '{query}': {e}")
+            return []
+
+    @classmethod
+    async def fetch_core_candidates(cls, query: str, limit: int = 15) -> list[dict]:
+        """Queries the CORE API for matching open-access papers with full-text links."""
+        url = f"{settings.CORE_API_URL}/search/works"
+        params = {
+            "q": query,
+            "limit": limit,
+        }
+        headers = {}
+        if settings.CORE_API_KEY:
+            headers["Authorization"] = f"Bearer {settings.CORE_API_KEY}"
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                response = await client.get(url, params=params, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    results = data.get("results", [])
+
+                    candidates = []
+                    for item in results:
+                        core_id = item.get("id")
+                        title = item.get("title")
+                        abstract = item.get("abstract", "")
+
+                        if not core_id or not title or not abstract:
+                            continue
+
+                        authors_raw = item.get("authors", [])
+                        if isinstance(authors_raw, list):
+                            author_parts = []
+                            for a in authors_raw:
+                                if isinstance(a, dict):
+                                    author_parts.append(a.get("name", ""))
+                                elif isinstance(a, str):
+                                    author_parts.append(a)
+                            author_str = ", ".join(p for p in author_parts if p) or "N/A"
+                        else:
+                            author_str = "N/A"
+
+                        year = item.get("yearPublished", "N/A")
+                        download_url = item.get("downloadUrl") or item.get("sourceFulltextUrls", [None])[0] if item.get("sourceFulltextUrls") else None
+
+                        candidates.append({
+                            "doc_id": f"core_{core_id}",
+                            "title": title,
+                            "author": author_str,
+                            "source": f"CORE, {year}",
+                            "text": abstract,
+                            "pdf_url": download_url,
+                        })
+                    # [DEBUG-SECTION]
+                    log_api_call("CORE", url, params=params, response_status=200, result_count=len(candidates))
+                    # [/DEBUG-SECTION]
+                    return candidates
+                elif response.status_code == 429:
+                    logger.warning("CORE API returned 429. Rate limited.")
+                    return []
+                else:
+                    logger.warning(f"CORE API returned status code {response.status_code}")
+                    return []
+        except Exception as e:
+            logger.error(f"Failed to fetch candidates from CORE for query '{query}': {e}")
+            return []
+
+    @classmethod
+    async def download_fulltext_pdf(cls, pdf_url: str) -> str | None:
+        """
+        Downloads and extracts text from an open-access PDF.
+
+        Returns the extracted full text, or None on failure.
+        """
+        if not pdf_url:
+            return None
+
+        try:
+            async with httpx.AsyncClient(
+                timeout=float(settings.FULLTEXT_DOWNLOAD_TIMEOUT),
+                follow_redirects=True,
+            ) as client:
+                response = await client.get(pdf_url)
+                if response.status_code != 200:
+                    logger.warning(f"PDF download returned status {response.status_code} for {pdf_url}")
+                    return None
+
+                content_type = response.headers.get("content-type", "")
+                if "pdf" not in content_type.lower() and not pdf_url.lower().endswith(".pdf"):
+                    logger.warning(f"Response is not a PDF ({content_type}) for {pdf_url}")
+                    return None
+
+                # Extract text using the existing extractor
+                from app.services.extractor import DocumentExtractorService, ExtractionError
+                try:
+                    text = DocumentExtractorService._extract_pdf(response.content)
+                    if text and len(text.strip()) > 100:
+                        return text.strip()
+                    else:
+                        logger.warning(f"Extracted text too short from PDF: {pdf_url}")
+                        return None
+                except ExtractionError as e:
+                    logger.warning(f"Failed to extract text from downloaded PDF {pdf_url}: {e}")
+                    return None
+        except Exception as e:
+            logger.warning(f"Failed to download PDF from {pdf_url}: {e}")
+            return None
+
+    @classmethod
     async def get_online_candidates(cls, queries: list[str], limit_per_query: int = None) -> list[dict]:
         """Fetches and merges candidates from multiple APIs, deduplicating them."""
         if limit_per_query is None:
@@ -252,11 +480,13 @@ class OnlineRetrieverService:
             if idx > 0:
                 await asyncio.sleep(1.0)  # Rate-limit padding between queries
                 
-            # Query APIs in sequence or gather them
+            # Query all APIs
             arxiv_res = await cls.fetch_arxiv_candidates(query, limit=limit_per_query)
             semschol_res = await cls.fetch_semantic_scholar_candidates(query, limit=limit_per_query)
+            crossref_res = await cls.fetch_crossref_candidates(query, limit=limit_per_query)
+            core_res = await cls.fetch_core_candidates(query, limit=limit_per_query)
             
-            for cand in arxiv_res + semschol_res:
+            for cand in arxiv_res + semschol_res + crossref_res + core_res:
                 cand_id = cand["doc_id"]
                 title_lower = cand["title"].lower().strip()
                 
@@ -266,6 +496,81 @@ class OnlineRetrieverService:
                     all_candidates.append(cand)
                     
         return all_candidates
+
+    @classmethod
+    async def get_online_candidates_with_relevance(
+        cls,
+        profile,
+        limit_per_query: int = None,
+    ) -> list[dict]:
+        """
+        Fetches candidates using TopicProfile-based queries and re-ranks them
+        by cosine similarity against the abstract embedding.
+
+        Filters out candidates below MIN_CANDIDATE_RELEVANCE.
+        """
+        queries = cls.extract_search_queries_from_profile(profile)
+        if not queries:
+            logger.warning("No search queries generated from TopicProfile. Falling back to empty candidate set.")
+            return []
+
+        candidates = await cls.get_online_candidates(queries, limit_per_query)
+
+        if not candidates:
+            return []
+
+        # Re-rank by abstract embedding similarity if enabled and embedding available
+        if settings.ABSTRACT_EMBEDDING_RERANK and profile.embedding:
+            try:
+                import numpy as np
+                profile_emb = np.array(profile.embedding)
+
+                model = SemanticMatcher.get_model()
+                candidate_texts = [c["text"] for c in candidates]
+                candidate_embeddings = model.encode(candidate_texts, show_progress_bar=False)
+
+                for i, cand in enumerate(candidates):
+                    cand_emb = candidate_embeddings[i]
+                    # Cosine similarity
+                    dot = np.dot(profile_emb, cand_emb)
+                    norm = np.linalg.norm(profile_emb) * np.linalg.norm(cand_emb)
+                    similarity = float(dot / norm) if norm > 0 else 0.0
+                    cand["relevance_score"] = similarity
+
+                # Filter by relevance threshold
+                candidates = [
+                    c for c in candidates
+                    if c.get("relevance_score", 0.0) >= settings.MIN_CANDIDATE_RELEVANCE
+                ]
+
+                # Sort by relevance descending
+                candidates.sort(key=lambda x: x.get("relevance_score", 0.0), reverse=True)
+
+                logger.info(f"After relevance filtering: {len(candidates)} candidates remain (threshold={settings.MIN_CANDIDATE_RELEVANCE})")
+                # [DEBUG-SECTION]
+                log_data_exchange("EmbeddingReranker", "CandidatePool",
+                    "relevance-scored candidates", record_count=len(candidates),
+                    sample={"top_score": round(candidates[0].get("relevance_score", 0), 4) if candidates else 0,
+                            "threshold": settings.MIN_CANDIDATE_RELEVANCE})
+                # [/DEBUG-SECTION]
+            except Exception as e:
+                logger.error(f"Failed to re-rank candidates by embedding similarity: {e}")
+
+        # Download full-text PDFs for top candidates if enabled
+        if settings.ENABLE_FULLTEXT_DOWNLOAD:
+            download_count = 0
+            for cand in candidates:
+                if download_count >= settings.MAX_FULLTEXT_DOWNLOADS_PER_JOB:
+                    break
+                pdf_url = cand.get("pdf_url")
+                if pdf_url:
+                    fulltext = await cls.download_fulltext_pdf(pdf_url)
+                    if fulltext:
+                        cand["text"] = fulltext
+                        download_count += 1
+                        logger.info(f"Downloaded full text for: {cand['title'][:60]}...")
+
+        return candidates
 
     @classmethod
     async def seed_ephemeral_candidates(cls, job_id: str, candidates: list[dict]) -> None:
@@ -361,3 +666,4 @@ class OnlineRetrieverService:
                 logger.info(f"Pruned {deleted} Elasticsearch sentences for job {job_id}")
         except Exception as e:
             logger.error(f"Failed to prune Elasticsearch cache for job {job_id}: {e}")
+

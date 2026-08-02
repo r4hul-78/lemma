@@ -17,6 +17,10 @@ from app.services.elasticsearch_client import (
 
 logger = logging.getLogger(__name__)
 
+# [DEBUG-SECTION] — To remove: delete this import line
+from app.debug_logger import log_matcher_decision
+# [/DEBUG-SECTION]
+
 def search_sentences_semantic(query_vector: list[float], k: int = 20, job_id: str = None) -> list[dict]:
     """
     Performs cosine similarity neighbor search against pgvector.
@@ -298,21 +302,31 @@ class DualTierMatcher:
         self.lexical_matcher = LexicalMatcher(references)
         self.semantic_matcher = SemanticMatcher(references)
 
-    def analyze_sentence(self, query_sentence: str, lexical_threshold: float = None, semantic_threshold: float = None, job_id: str = None) -> dict | None:
-        """Runs hybrid plagiarism analysis using RRF across Elasticsearch and pgvector."""
+    def analyze_sentence(self, query_sentence: str, lexical_threshold: float = None, semantic_threshold: float = None, job_id: str = None, match_type: str = "hybrid") -> dict | None:
+        """Runs plagiarism analysis using the specified matching type (lexical, semantic, or hybrid)."""
         if lexical_threshold is None:
             lexical_threshold = settings.LEXICAL_THRESHOLD
         if semantic_threshold is None:
             semantic_threshold = settings.SEMANTIC_THRESHOLD
             
-        # 1. Retrieve candidates from Elasticsearch (Query A)
-        es_results = search_sentences_bm25(query_sentence, k=20, job_id=job_id)
-        
-        # 2. Retrieve candidates from pgvector (Query B)
-        model = SemanticMatcher.get_model()
-        query_embedding = model.encode(query_sentence, show_progress_bar=False).tolist()
-        semantic_results = search_sentences_semantic(query_embedding, k=20, job_id=job_id)
-        
+        es_results = []
+        semantic_results = []
+
+        if match_type == "lexical":
+            # Run ONLY lexical matching
+            es_results = search_sentences_bm25(query_sentence, k=20, job_id=job_id)
+        elif match_type == "semantic":
+            # Run ONLY semantic matching
+            model = SemanticMatcher.get_model()
+            query_embedding = model.encode(query_sentence, show_progress_bar=False).tolist()
+            semantic_results = search_sentences_semantic(query_embedding, k=20, job_id=job_id)
+        else:
+            # Run hybrid matching (both)
+            es_results = search_sentences_bm25(query_sentence, k=20, job_id=job_id)
+            model = SemanticMatcher.get_model()
+            query_embedding = model.encode(query_sentence, show_progress_bar=False).tolist()
+            semantic_results = search_sentences_semantic(query_embedding, k=20, job_id=job_id)
+            
         if not es_results and not semantic_results:
             return None
             
@@ -425,6 +439,10 @@ class DualTierMatcher:
                 is_valid = True
                 
         if not is_valid:
+            # [DEBUG-SECTION]
+            log_matcher_decision(query_sentence, match_type=None, score=normalized_rrf, matched_text=best["text"],
+                thresholds={"lexical": lexical_threshold, "semantic": semantic_threshold, "hybrid": settings.HYBRID_THRESHOLD, "actual_lexical_sim": round(lexical_sim, 4), "actual_semantic": round(best.get("semantic_score") or 0, 4)})
+            # [/DEBUG-SECTION]
             return None
             
         # Compute display score
@@ -434,10 +452,10 @@ class DualTierMatcher:
             display_score = lexical_sim
             
         display_score = max(0.0, min(1.0, display_score))
-        
-        return {
+
+        result = {
             "score": display_score,
-            "text": best["text"],
+            "text": best["text"], 
             "doc_id": best["document_id"],
             "doc_title": best["title"],
             "doc_author": best["author"],
@@ -445,13 +463,19 @@ class DualTierMatcher:
             "match_type": match_type,
             "normalized_rrf": normalized_rrf
         }
+        # [DEBUG-SECTION]
+        log_matcher_decision(query_sentence, match_type=match_type, score=display_score, matched_text=best["text"],
+            thresholds={"lexical": lexical_threshold, "semantic": semantic_threshold, "hybrid": settings.HYBRID_THRESHOLD, "rrf_normalized": round(normalized_rrf, 4)})
+        # [/DEBUG-SECTION]
+        return result
 
     def analyze_document(
         self, 
         sentences: list[dict], 
         lexical_threshold: float = None, 
         semantic_threshold: float = None,
-        job_id: str = None
+        job_id: str = None,
+        match_type: str = "hybrid"
     ) -> dict:
         """
         Performs full document plagiarism analysis across segmented sentence coordinate structures.
@@ -463,7 +487,7 @@ class DualTierMatcher:
         
         for s in sentences:
             q_text = s["text"]
-            match = self.analyze_sentence(q_text, lexical_threshold, semantic_threshold, job_id=job_id)
+            match = self.analyze_sentence(q_text, lexical_threshold, semantic_threshold, job_id=job_id, match_type=match_type)
             
             if match:
                 if match["match_type"] == "lexical":

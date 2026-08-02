@@ -67,6 +67,38 @@ class Settings(BaseSettings):
     ENABLE_ONLINE_RETRIEVAL: bool = True
     SEMANTIC_SCHOLAR_API_KEY: str | None = None
     MAX_ONLINE_CANDIDATES_PER_QUERY: int = 30
+    MIN_CANDIDATE_RELEVANCE: float = 0.30
+    ABSTRACT_EMBEDDING_RERANK: bool = True
+    
+    # Full-Text Download
+    ENABLE_FULLTEXT_DOWNLOAD: bool = True
+    FULLTEXT_DOWNLOAD_TIMEOUT: int = 30
+    MAX_FULLTEXT_DOWNLOADS_PER_JOB: int = 10
+    
+    # CORE API
+    CORE_API_KEY: str | None = None
+    CORE_API_URL: str = "https://api.core.ac.uk/v3"
+    
+    # Section Parser
+    SECTION_PARSER_ENABLED: bool = True
+    SECTION_HEADING_MIN_LENGTH: int = 3
+    SECTION_HEADING_MAX_LENGTH: int = 80
+    
+    # Topic Extraction
+    TOPIC_EXTRACTION_MAX_TOPICS: int = 5
+    TOPIC_EXTRACTION_MAX_KEYWORDS: int = 10
+    ABSTRACT_FALLBACK_SENTENCES: int = 5
+    
+    # Paper Types
+    DEFAULT_PAPER_TYPE: str = "other"
+    
+    # Stricter thresholds for methods/results in empirical papers
+    EMPIRICAL_METHODS_LEXICAL_THRESHOLD: float = 0.85
+    EMPIRICAL_METHODS_SEMANTIC_THRESHOLD: float = 0.80
+    EMPIRICAL_METHODS_HYBRID_THRESHOLD: float = 0.75
+    EMPIRICAL_RESULTS_LEXICAL_THRESHOLD: float = 0.80
+    EMPIRICAL_RESULTS_SEMANTIC_THRESHOLD: float = 0.75
+    EMPIRICAL_RESULTS_HYBRID_THRESHOLD: float = 0.70
     
     # Deprecated/Fallback Settings
     SQLITE_DB_FILE: str = "lemma.db"
@@ -80,6 +112,10 @@ class Settings(BaseSettings):
     # Ollama settings
     OLLAMA_URL: str = "http://127.0.0.1:11434"
     OLLAMA_MODEL: str = "lemma-model"
+
+    # [DEBUG-SECTION] Developer debug mode — set LEMMA_DEBUG_MODE=true in .env
+    # To remove: delete this line and the debug_logger.py module
+    DEBUG_MODE: bool = False
     
     # Firebase settings (to be integrated fully in Phase 4)
     FIREBASE_CREDENTIALS_PATH: str | None = None

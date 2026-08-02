@@ -4,13 +4,13 @@ from celery.result import AsyncResult
 # pyrefly: ignore [missing-import]
 import os
 from sqlalchemy import create_engine
-from fastapi import FastAPI, UploadFile, File, HTTPException, status
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from app.config import settings
 from app.services.pdf_generator import PDFGeneratorService
-from app.schemas.document import DocumentUploadResponse, SentenceCoordinate
+from app.schemas.document import DocumentUploadResponse, SentenceCoordinate, PaperType, RawTextAnalysisRequest
 from app.schemas.rewrite import RewriteRequest, RewriteResponse
 from app.services.extractor import (
     DocumentExtractorService,
@@ -50,6 +50,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# [DEBUG-SECTION] — Attach debug middleware when debug mode is active.
+# To remove: delete this block and the debug_logger import.
+if settings.DEBUG_MODE:
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from app.debug_logger import debug_middleware
+    app.add_middleware(BaseHTTPMiddleware, dispatch=debug_middleware)
+# [/DEBUG-SECTION]
 
 # Global Exception Handlers
 @app.exception_handler(FileSizeExceededError)
@@ -387,7 +395,11 @@ async def upload_document(file: UploadFile = File(...)):
     status_code=status.HTTP_202_ACCEPTED,
     include_in_schema=False
 )
-async def analyze_document_async(file: UploadFile = File(...)):
+async def analyze_document_async(
+    file: UploadFile = File(...),
+    paper_type: str = Form(default="other"),
+    match_type: str = Form(default="hybrid"),
+):
     await check_postgres_online()
     await check_elasticsearch_online()
 
@@ -396,6 +408,11 @@ async def analyze_document_async(file: UploadFile = File(...)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No filename provided in upload request."
         )
+
+    # Validate paper_type
+    valid_types = {e.value for e in PaperType}
+    if paper_type not in valid_types:
+        paper_type = "other"
         
     # Validate extension using settings before writing to disk
     file_ext = file.filename.split(".")[-1].lower()
@@ -436,9 +453,13 @@ async def analyze_document_async(file: UploadFile = File(...)):
             detail=f"Failed to save temporary file: {str(e)}"
         )
 
+    # Validate match_type
+    if match_type not in ("lexical", "semantic", "hybrid"):
+        match_type = "hybrid"
+
     # Trigger celery task with custom task ID matching the job ID
     analyze_document_task.apply_async(
-        args=[str(temp_filepath), file.filename],
+        args=[str(temp_filepath), file.filename, paper_type, match_type],
         task_id=job_id
     )
     
@@ -536,6 +557,46 @@ async def get_job_report_pdf(job_id: str):
             detail=f"Failed to generate PDF report: {str(e)}"
         )
 
+
+@app.post(
+    f"{settings.API_V1_STR}/analyze/text",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Analyze raw text for plagiarism",
+    description="Accepts raw text input. Adaptively applies section parsing based on text length and heading presence."
+)
+async def analyze_raw_text(payload: RawTextAnalysisRequest):
+    await check_postgres_online()
+    await check_elasticsearch_online()
+
+    text = payload.text.strip()
+    paper_type = payload.paper_type.value
+    match_type = payload.match_type
+    if match_type not in ("lexical", "semantic", "hybrid"):
+        match_type = "hybrid"
+
+    # Save raw text to a temporary .txt file for the Celery task
+    job_id = str(uuid.uuid4())
+    temp_filename = f"{job_id}_raw_input.txt"
+    temp_filepath = settings.UPLOAD_DIR / temp_filename
+
+    try:
+        with open(temp_filepath, "w", encoding="utf-8") as f:
+            f.write(text)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save raw text: {str(e)}"
+        )
+
+    analyze_document_task.apply_async(
+        args=[str(temp_filepath), "raw_input.txt", paper_type, match_type],
+        task_id=job_id
+    )
+
+    return {
+        "job_id": job_id,
+        "status": "pending"
+    }
 
 
 @app.post(

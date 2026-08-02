@@ -209,6 +209,20 @@ We use `pytest` for unit and integration testing. Eager mode is forced automatic
 
 ---
 
+## 🔒 Security & Privacy
+
+| Concern | Mitigation |
+|:---|:---|
+| Uploaded paper content leaking to external APIs | Only abstract-derived keywords and phrases are sent as search queries. Raw text is never uploaded. |
+| Stored uploads on disk | Temp files are deleted in the `finally` block of the Celery task. |
+| SQL injection via paper_type or text input | Pydantic enum validation for paper_type; parameterized queries for all DB operations. |
+| CORS wide-open in dev | Add env-based origin restriction for production. |
+| Ephemeral candidate data retention | Pruned immediately after analysis. No long-term storage of fetched papers. |
+| Abstract text in analysis_jobs table | Add a data retention policy. |
+| File size limit | Existing 100MB limit. Adequate. |
+
+---
+
 ## 🗺️ Build Roadmap
 
 * [x] **Phase 1**: Core Ingestion, Parsing Service & spaCy Coordinate Segmenter
@@ -216,3 +230,15 @@ We use `pytest` for unit and integration testing. Eager mode is forced automatic
 * [x] **Phase 3**: Celery Asynchronous Job Queues, Redis Integration, and Ollama Paraphraser Workspace
 * [x] **Phase 4**: Stark dark-theme Frontend with Interactive 3D Canvas and Workspace Switching
 * [x] **Phase 5**: WeasyPrint PDF Generation & End-to-End E2E Verification
+* [ ] **Phase 6**: Section-Aware Analysis, Abstract-Driven Topic Extraction, Enhanced Multi-API Retrieval & Full-Text Download
+
+---
+
+## 🔮 Future Implementations
+
+* **Full Async Celery Setup**: Migrate from `run_async_in_thread()` to native async Celery tasks using `celery[asyncio]` with the `--pool=asyncio` worker flag. This eliminates thread-per-task overhead and allows true async I/O for API calls and PDF downloads. Implement when concurrent analysis jobs exceed ~10 simultaneously.
+* **Expanded Paper Type Taxonomy**: Add `meta_analysis`, `theoretical`, `technical_report`, `thesis`, and `conference_paper` types with type-specific section detection and threshold rules.
+* **Self-Plagiarism Detection**: Intra-document similarity check comparing sections pairwise to detect internal content duplication.
+* **Citation-Aware Scoring**: Reduce plagiarism severity for properly cited sentences instead of flagging them equally.
+* **Multi-Language Support**: Expand heading detection and NLP pipelines beyond English.
+

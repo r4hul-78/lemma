@@ -4,7 +4,7 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     // API URL configuration
-    let API_BASE_URL = 'https://r4hul-78-lemma-backend.hf.space'; -icon
+    let API_BASE_URL = 'http://localhost:8000'; // 'https://r4hul-78-lemma-backend.hf.space'
     let API_UPLOAD_URL = `${API_BASE_URL}/api/v1/documents/upload`;
     let API_ANALYZE_URL = `${API_BASE_URL}/api/v1/analyze`;
     let API_STATUS_URL = `${API_BASE_URL}/api/v1/status`;
@@ -400,8 +400,23 @@ document.addEventListener("DOMContentLoaded", () => {
         isAnalyzing = true;
         checkServerHealth();
 
+        // Retrieve selected match type based on active toggle
+        const toggleLexical = document.getElementById("toggle-lexical");
+        const toggleSemantic = document.getElementById("toggle-semantic");
+        const toggleHybrid = document.getElementById("toggle-hybrid");
+        
+        let matchType = "hybrid";
+        if (toggleLexical && toggleLexical.checked) {
+            matchType = "lexical";
+        } else if (toggleSemantic && toggleSemantic.checked) {
+            matchType = "semantic";
+        } else if (toggleHybrid && toggleHybrid.checked) {
+            matchType = "hybrid";
+        }
+
         const formData = new FormData();
         formData.append("file", file);
+        formData.append("match_type", matchType);
 
         try {
             const response = await fetch(API_ANALYZE_URL, {
@@ -462,36 +477,23 @@ document.addEventListener("DOMContentLoaded", () => {
                     semanticChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Semantic Matching Complete';
                     semanticChk.className = "checklist-item done";
 
-                    // Calculate real percentages
-                    const analysis = uploadResponseData.analysis;
-                    const total = analysis.total_sentences;
-                    const lexicalCount = analysis.lexical_matches_count;
-                    const hybridCount = analysis.hybrid_matches_count || 0;
-                    const semanticCount = analysis.semantic_matches_count;
+                    renderFilteredAnalysis();
 
-                    const pctL = total > 0 ? Math.round((lexicalCount / total) * 100) : 0;
-                    const pctH = total > 0 ? Math.round((hybridCount / total) * 100) : 0;
-                    const pctS = total > 0 ? Math.round((semanticCount / total) * 100) : 0;
-                    const pctO = Math.max(0, 100 - pctL - pctH - pctS);
+                    const activeMatches = uploadResponseData.analysis.matches || [];
+                    const isLexicalEnabled = document.getElementById("toggle-lexical").checked;
+                    const isSemanticEnabled = document.getElementById("toggle-semantic").checked;
+                    const isHybridEnabled = document.getElementById("toggle-hybrid").checked;
+                    const isOtherEnabled = document.getElementById("toggle-other").checked;
 
-                    // Set circular progress middle text
-                    const realPlagScore = pctL + pctH + pctS;
-                    progressScore.textContent = `${realPlagScore}%`;
-
-                    // Set conic gradient
-                    const degL = pctL * 3.6;
-                    const degH = pctH * 3.6;
-                    const degS = pctS * 3.6;
-                    progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #f59e0b ${degL}deg ${degL + degH}deg, #8b5cf6 ${degL + degH}deg ${degL + degH + degS}deg, #10b981 ${degL + degH + degS}deg 360deg)`;
-
-                    // Update Legend Values
-                    document.getElementById("legend-val-lexical").textContent = `${pctL}%`;
-                    document.getElementById("legend-val-hybrid").textContent = `${pctH}%`;
-                    document.getElementById("legend-val-semantic").textContent = `${pctS}%`;
-                    document.getElementById("legend-val-original").textContent = `${pctO}%`;
-
-                    // Apply visual highlights to document sentences
-                    applyPlagiarismHighlights(analysis);
+                    const activeCount = activeMatches.filter(m => {
+                        const type = m.match_type;
+                        if (type === "lexical") return isLexicalEnabled;
+                        if (type === "semantic") return isSemanticEnabled;
+                        if (type === "hybrid") return isHybridEnabled;
+                        return isOtherEnabled;
+                    }).length;
+                    const total = uploadResponseData.analysis.total_sentences;
+                    const realPlagScore = total > 0 ? Math.round((activeCount / total) * 100) : 0;
 
                     // Show Download PDF button
                     btnDownloadPdf.classList.remove("hidden");
@@ -1393,30 +1395,7 @@ document.addEventListener("DOMContentLoaded", () => {
         semanticChk.innerHTML = '<i class="fa-regular fa-circle-check"></i> Semantic Matching Complete';
         semanticChk.className = "checklist-item done";
 
-        const total = analysis.total_sentences;
-        const lexicalCount = analysis.lexical_matches_count;
-        const hybridCount = analysis.hybrid_matches_count || 0;
-        const semanticCount = analysis.semantic_matches_count;
-
-        const pctL = total > 0 ? Math.round((lexicalCount / total) * 100) : 0;
-        const pctH = total > 0 ? Math.round((hybridCount / total) * 100) : 0;
-        const pctS = total > 0 ? Math.round((semanticCount / total) * 100) : 0;
-        const pctO = Math.max(0, 100 - pctL - pctH - pctS);
-
-        const realPlagScore = pctL + pctH + pctS;
-        progressScore.textContent = `${realPlagScore}%`;
-
-        const degL = pctL * 3.6;
-        const degH = pctH * 3.6;
-        const degS = pctS * 3.6;
-        progressCircle.style.background = `conic-gradient(#ef4444 0deg ${degL}deg, #f59e0b ${degL}deg ${degL + degH}deg, #8b5cf6 ${degL + degH}deg ${degL + degH + degS}deg, #10b981 ${degL + degH + degS}deg 360deg)`;
-
-        document.getElementById("legend-val-lexical").textContent = `${pctL}%`;
-        document.getElementById("legend-val-hybrid").textContent = `${pctH}%`;
-        document.getElementById("legend-val-semantic").textContent = `${pctS}%`;
-        document.getElementById("legend-val-original").textContent = `${pctO}%`;
-
-        applyPlagiarismHighlights(analysis);
+        renderFilteredAnalysis();
         btnRunAnalysis.disabled = false;
 
         // Switch view to Plagiarism Check
@@ -1475,5 +1454,143 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    /* -------------------------------------------------------------
+     * Real-time Plagiarism Toggle Control System [NEW]
+     * ------------------------------------------------------------- */
+    function renderFilteredAnalysis() {
+        if (!uploadResponseData || !uploadResponseData.analysis) return;
+
+        const analysis = uploadResponseData.analysis;
+        const total = analysis.total_sentences;
+
+        // Read toggle states
+        const isLexicalEnabled = document.getElementById("toggle-lexical").checked;
+        const isSemanticEnabled = document.getElementById("toggle-semantic").checked;
+        const isHybridEnabled = document.getElementById("toggle-hybrid").checked;
+        const isOtherEnabled = document.getElementById("toggle-other").checked;
+
+        // Filter matches based on checkbox states
+        const filteredMatches = [];
+        let lexicalCount = 0;
+        let semanticCount = 0;
+        let hybridCount = 0;
+        let otherCount = 0;
+
+        if (analysis.matches) {
+            analysis.matches.forEach(match => {
+                const type = match.match_type;
+                if (type === "lexical") {
+                    if (isLexicalEnabled) {
+                        filteredMatches.push(match);
+                        lexicalCount++;
+                    }
+                } else if (type === "semantic") {
+                    if (isSemanticEnabled) {
+                        filteredMatches.push(match);
+                        semanticCount++;
+                    }
+                } else if (type === "hybrid") {
+                    if (isHybridEnabled) {
+                        filteredMatches.push(match);
+                        hybridCount++;
+                    }
+                } else {
+                    if (isOtherEnabled) {
+                        filteredMatches.push(match);
+                        otherCount++;
+                    }
+                }
+            });
+        }
+
+        // Calculate plagiarism scores based only on active match counts
+        const plagiarizedCount = filteredMatches.length;
+        const realPlagScore = total > 0 ? Math.round((plagiarizedCount / total) * 100) : 0;
+
+        const pctL = total > 0 ? Math.round((lexicalCount / total) * 100) : 0;
+        const pctH = total > 0 ? Math.round((hybridCount / total) * 100) : 0;
+        const pctS = total > 0 ? Math.round((semanticCount / total) * 100) : 0;
+        const pctO = total > 0 ? Math.round((otherCount / total) * 100) : 0;
+        const pctClean = Math.max(0, 100 - pctL - pctH - pctS - pctO);
+
+        // Update Circular Progress
+        const progressScore = document.getElementById("plagiarism-score-text");
+        const progressCircle = document.querySelector(".circular-progress");
+        if (progressScore) progressScore.textContent = `${realPlagScore}%`;
+        if (progressCircle) {
+            const degL = pctL * 3.6;
+            const degH = pctH * 3.6;
+            const degS = pctS * 3.6;
+            const degO = pctO * 3.6;
+            progressCircle.style.background = `conic-gradient(
+                #ef4444 0deg ${degL}deg, 
+                #f59e0b ${degL}deg ${degL + degH}deg, 
+                #8b5cf6 ${degL + degH}deg ${degL + degH + degS}deg, 
+                #3b82f6 ${degL + degH + degS}deg ${degL + degH + degS + degO}deg, 
+                #10b981 ${degL + degH + degS + degO}deg 360deg
+            )`;
+        }
+
+        // Update Legend values
+        document.getElementById("legend-val-lexical").textContent = `${pctL}%`;
+        document.getElementById("legend-val-hybrid").textContent = `${pctH}%`;
+        document.getElementById("legend-val-semantic").textContent = `${pctS}%`;
+        document.getElementById("legend-val-original").textContent = `${pctClean}%`;
+
+        // Apply visual highlights to document sentences using filtered matches
+        const filteredAnalysis = {
+            ...analysis,
+            matches: filteredMatches
+        };
+        applyPlagiarismHighlights(filteredAnalysis);
+
+        // Update Inspector if a sentence is currently selected
+        const activeSpan = document.querySelector(".doc-sentence.active");
+        if (activeSpan) {
+            const start = parseInt(activeSpan.dataset.start);
+            const sentenceText = activeSpan.textContent;
+            const sentence = {
+                start_char: start,
+                end_char: parseInt(activeSpan.dataset.end),
+                text: sentenceText
+            };
+
+            const currentMatch = filteredMatches.find(m => m.query_sentence.start_char === start);
+            inspectSentence(sentence, currentMatch, true);
+        }
+    }
+
+    function initPlagiarismToggles() {
+        const toggleLexical = document.getElementById("toggle-lexical");
+        const toggleSemantic = document.getElementById("toggle-semantic");
+        const toggleHybrid = document.getElementById("toggle-hybrid");
+        const toggleOther = document.getElementById("toggle-other");
+
+        const toggles = [toggleLexical, toggleSemantic, toggleHybrid, toggleOther];
+
+        toggles.forEach(toggle => {
+            if (!toggle) return;
+            toggle.addEventListener("change", (e) => {
+                if (e.target.checked) {
+                    // Force mutual exclusivity like radio buttons
+                    toggles.forEach(other => {
+                        if (other && other !== e.target) {
+                            other.checked = false;
+                        }
+                    });
+                } else {
+                    // Ensure at least one toggle remains checked
+                    const anyChecked = toggles.some(t => t && t.checked);
+                    if (!anyChecked) {
+                        e.target.checked = true;
+                    }
+                }
+                renderFilteredAnalysis();
+            });
+        });
+    }
+
+    initPlagiarismToggles();
 });
 
