@@ -6,6 +6,11 @@ echo.
 
 cd /d "%~dp0"
 
+:: Parse command-line arguments
+set DEV_MODE=0
+if "%1"=="--dev" set DEV_MODE=1
+if "%1"=="-d" set DEV_MODE=1
+
 :: 1. Check Python installation
 where python >nul 2>nul
 if %errorlevel% neq 0 (
@@ -50,12 +55,33 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: 5. Run Backend Server
+:: 5. Configure environment based on mode
+if %DEV_MODE%==1 (
+    echo.
+    echo [INFO] Running in DEVELOPMENT mode (--dev)
+    echo [INFO] Using docker-compose.yml (Local Postgres container)
+    echo [INFO] Loading .env.dev configuration...
+    if exist "backend\.env.dev" (
+        copy /Y "backend\.env.dev" "backend\.env" >nul
+        echo [INFO] Copied .env.dev to .env
+    )
+) else (
+    echo.
+    echo [INFO] Running in FULL STACK mode
+    echo [INFO] Ensure Docker services and Ollama are running separately.
+)
+
+:: 6. Run Backend Server
 echo.
 echo =======================================================================
 echo          SUCCESS: Setup complete. Starting Uvicorn development server...
 echo          You can access the client UI at: http://localhost:8000
 echo          You can view API swagger docs at: http://localhost:8000/docs
+if %DEV_MODE%==1 (
+    echo          Mode: DEVELOPMENT (Postgres only, no Ollama)
+) else (
+    echo          Mode: FULL STACK (all services expected)
+)
 echo =======================================================================
 echo.
 

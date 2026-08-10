@@ -171,20 +171,7 @@ async def health():
             local_logger.warning(f"Health check: Database connection failed: {e}")
             return "disconnected"
 
-    # 2. Define Elasticsearch checker task
-    async def check_elasticsearch():
-        try:
-            async with httpx.AsyncClient(timeout=0.8) as client:
-                res = await client.get(settings.ELASTICSEARCH_URL)
-                if res.status_code == 200:
-                    return "healthy"
-                else:
-                    return "unhealthy"
-        except Exception as e:
-            local_logger.warning(f"Health check: Elasticsearch ping failed: {e}")
-            return "offline"
-
-    # 3. Define Ollama checker task
+    # 2. Define Ollama checker task
     async def check_ollama():
         try:
             # Check Ollama status directly with a fast 1.0s timeout
@@ -202,7 +189,7 @@ async def health():
             local_logger.warning(f"Health check: Ollama check failed: {e}")
             return "offline", []
 
-    # 4. Define Celery checker task
+    # 3. Define Celery checker task
     async def check_celery_status():
         if settings.CELERY_ALWAYS_EAGER:
             return "idle"
@@ -230,17 +217,16 @@ async def health():
 
     # Run all checks in parallel
     db_task = check_database()
-    es_task = check_elasticsearch()
     ollama_task = check_ollama()
     celery_task = check_celery_status()
     
-    db_status, es_status, (ollama_status, available_models), celery_status = await asyncio.gather(
-        db_task, es_task, ollama_task, celery_task
+    db_status, (ollama_status, available_models), celery_status = await asyncio.gather(
+        db_task, ollama_task, celery_task
     )
 
     # Determine general status
     general_status = "ok"
-    if db_status == "disconnected" or es_status == "offline" or ollama_status == "offline":
+    if db_status == "disconnected" or ollama_status == "offline":
         general_status = "degraded"
 
     return {
@@ -249,9 +235,6 @@ async def health():
         "services": {
             "database": {
                 "status": db_status
-            },
-            "elasticsearch": {
-                "status": es_status
             },
             "ollama": {
                 "status": ollama_status,
@@ -305,22 +288,6 @@ async def check_postgres_online():
             detail="PostgreSQL database service is offline. Please start the PostgreSQL Docker container (run: docker compose up -d)."
         )
 
-async def check_elasticsearch_online():
-    from urllib.parse import urlparse
-    es_host = "localhost"
-    es_port = 9200
-    if settings.ELASTICSEARCH_URL:
-        try:
-            parsed = urlparse(settings.ELASTICSEARCH_URL)
-            if parsed.hostname: es_host = parsed.hostname
-            if parsed.port: es_port = parsed.port
-        except Exception:
-            pass
-    if not await check_service_port_open(es_host, es_port):
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Elasticsearch service is offline. Please start the Elasticsearch Docker container (run: docker compose up -d)."
-        )
 
 async def check_ollama_online():
     from urllib.parse import urlparse
@@ -348,7 +315,6 @@ async def check_ollama_online():
 )
 async def upload_document(file: UploadFile = File(...)):
     await check_postgres_online()
-    await check_elasticsearch_online()
 
     if not file.filename:
         raise HTTPException(
@@ -401,7 +367,6 @@ async def analyze_document_async(
     match_type: str = Form(default="hybrid"),
 ):
     await check_postgres_online()
-    await check_elasticsearch_online()
 
     if not file.filename:
         raise HTTPException(
@@ -566,7 +531,6 @@ async def get_job_report_pdf(job_id: str):
 )
 async def analyze_raw_text(payload: RawTextAnalysisRequest):
     await check_postgres_online()
-    await check_elasticsearch_online()
 
     text = payload.text.strip()
     paper_type = payload.paper_type.value

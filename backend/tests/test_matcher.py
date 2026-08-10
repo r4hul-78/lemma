@@ -8,7 +8,7 @@ from app.services.matcher import (
 from app.services.database import DatabaseService
 from app.config import settings
 
-def test_database_and_elasticsearch_initialization():
+def test_database_initialization():
     # Trigger loading references, which seeds database and ES if empty
     references = load_references()
     assert len(references) > 0

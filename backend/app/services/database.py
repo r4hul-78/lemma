@@ -1,18 +1,34 @@
 import os
+import logging
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 class DatabaseService:
     """Manages PostgreSQL database connections, table creation, and metadata queries."""
     
     @staticmethod
     def get_connection():
-        """Returns a connection to the PostgreSQL database with a 5-second connection timeout."""
+        """
+        Returns a connection to the PostgreSQL database.
+        
+        Automatically detects Supabase URLs and adds sslmode=require.
+        Supports both DATABASE_URL (full connection string) and individual
+        POSTGRES_* settings for backward compatibility.
+        """
         db_url = os.environ.get("DATABASE_URL") or settings.DATABASE_URL
         if db_url:
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql://", 1)
+            
+            # Supabase requires SSL — append sslmode if not already present
+            is_supabase = "supabase.co" in db_url or "supabase.com" in db_url
+            if is_supabase and "sslmode" not in db_url:
+                separator = "&" if "?" in db_url else "?"
+                db_url = f"{db_url}{separator}sslmode=require"
+            
             return psycopg2.connect(db_url, connect_timeout=5)
             
         conn = psycopg2.connect(
@@ -33,6 +49,9 @@ class DatabaseService:
                 # Enable pgvector extension
                 cursor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
                 
+                # Enable pg_trgm extension for trigram fuzzy matching
+                cursor.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+                
                 # Create documents table
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS documents (
@@ -43,7 +62,7 @@ class DatabaseService:
                     );
                 """)
                 
-                # Create sentences table
+                # Create sentences table with tsvector column for full-text search
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS sentences (
                         id SERIAL PRIMARY KEY,
@@ -51,14 +70,34 @@ class DatabaseService:
                         sentence_index INT NOT NULL,
                         text TEXT NOT NULL,
                         embedding vector(384),
+                        text_tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', text)) STORED,
                         FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE
                     );
+                """)
+                
+                # Schema migration check: ensure text_tsv column exists on pre-existing database tables
+                cursor.execute("""
+                    ALTER TABLE sentences
+                    ADD COLUMN IF NOT EXISTS text_tsv tsvector
+                    GENERATED ALWAYS AS (to_tsvector('english', text)) STORED;
                 """)
                 
                 # Create HNSW index on the vector embedding column for fast cosine distance search
                 cursor.execute("""
                     CREATE INDEX IF NOT EXISTS sentences_embedding_hnsw_idx 
                     ON sentences USING hnsw (embedding vector_cosine_ops);
+                """)
+                
+                # Create GIN index on the tsvector column for full-text search ranking
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS sentences_text_tsv_gin_idx
+                    ON sentences USING gin (text_tsv);
+                """)
+                
+                # Create GIN trigram index on the text column for fuzzy similarity matching
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS sentences_text_trgm_gin_idx
+                    ON sentences USING gin (text gin_trgm_ops);
                 """)
             conn.commit()
 

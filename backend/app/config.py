@@ -48,9 +48,9 @@ class Settings(BaseSettings):
     SPACY_MODEL: str = "en_core_web_sm"
     SENTENCE_TRANSFORMERS_MODEL: str = "all-MiniLM-L6-v2"
     MOCK_DATABASE_PATH: Path = BASE_DIR / "data" / "mock_references.json"
-    LEXICAL_THRESHOLD: float = 0.70
-    SEMANTIC_THRESHOLD: float = 0.65
-    HYBRID_THRESHOLD: float = 0.60
+    LEXICAL_THRESHOLD: float = 0.55
+    SEMANTIC_THRESHOLD: float = 0.55
+    HYBRID_THRESHOLD: float = 0.50
     
     # Database Settings
     DATABASE_URL: str | None = None
@@ -60,20 +60,17 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     
-    # Elasticsearch Settings
-    ELASTICSEARCH_URL: str = "http://localhost:9200"
-    
     # Online Retrieval Settings
     ENABLE_ONLINE_RETRIEVAL: bool = True
     SEMANTIC_SCHOLAR_API_KEY: str | None = None
     MAX_ONLINE_CANDIDATES_PER_QUERY: int = 30
-    MIN_CANDIDATE_RELEVANCE: float = 0.30
+    MIN_CANDIDATE_RELEVANCE: float = 0.15
     ABSTRACT_EMBEDDING_RERANK: bool = True
     
     # Full-Text Download
     ENABLE_FULLTEXT_DOWNLOAD: bool = True
     FULLTEXT_DOWNLOAD_TIMEOUT: int = 30
-    MAX_FULLTEXT_DOWNLOADS_PER_JOB: int = 10
+    MAX_FULLTEXT_DOWNLOADS_PER_JOB: int = 15
     
     # CORE API
     CORE_API_KEY: str | None = None
@@ -92,13 +89,13 @@ class Settings(BaseSettings):
     # Paper Types
     DEFAULT_PAPER_TYPE: str = "other"
     
-    # Stricter thresholds for methods/results in empirical papers
-    EMPIRICAL_METHODS_LEXICAL_THRESHOLD: float = 0.85
-    EMPIRICAL_METHODS_SEMANTIC_THRESHOLD: float = 0.80
-    EMPIRICAL_METHODS_HYBRID_THRESHOLD: float = 0.75
-    EMPIRICAL_RESULTS_LEXICAL_THRESHOLD: float = 0.80
-    EMPIRICAL_RESULTS_SEMANTIC_THRESHOLD: float = 0.75
-    EMPIRICAL_RESULTS_HYBRID_THRESHOLD: float = 0.70
+    # Thresholds for methods/results in empirical papers
+    EMPIRICAL_METHODS_LEXICAL_THRESHOLD: float = 0.65
+    EMPIRICAL_METHODS_SEMANTIC_THRESHOLD: float = 0.60
+    EMPIRICAL_METHODS_HYBRID_THRESHOLD: float = 0.55
+    EMPIRICAL_RESULTS_LEXICAL_THRESHOLD: float = 0.65
+    EMPIRICAL_RESULTS_SEMANTIC_THRESHOLD: float = 0.60
+    EMPIRICAL_RESULTS_HYBRID_THRESHOLD: float = 0.55
     
     # Deprecated/Fallback Settings
     SQLITE_DB_FILE: str = "lemma.db"
@@ -112,6 +109,7 @@ class Settings(BaseSettings):
     # Ollama settings
     OLLAMA_URL: str = "http://127.0.0.1:11434"
     OLLAMA_MODEL: str = "lemma-model"
+    OLLAMA_KEEP_ALIVE: str = "5m"  # How long the model stays loaded after last use. "0" = unload immediately.
 
     # [DEBUG-SECTION] Developer debug mode — set LEMMA_DEBUG_MODE=true in .env
     # To remove: delete this line and the debug_logger.py module

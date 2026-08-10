@@ -180,7 +180,7 @@ def analyze_document_task(self, file_path: str, original_filename: str, paper_ty
                     OnlineRetrieverService.seed_ephemeral_candidates(job_id, candidates)
                 )
                 # [DEBUG-SECTION]
-                log_data_exchange("OnlineRetriever", "PostgreSQL + Elasticsearch",
+                log_data_exchange("OnlineRetriever", "PostgreSQL",
                     "ephemeral candidate sentences", record_count=len(candidates),
                     sample={"first_title": candidates[0]["title"] if candidates else "(none)"})
                 # [/DEBUG-SECTION]
@@ -243,7 +243,7 @@ def analyze_document_task(self, file_path: str, original_filename: str, paper_ty
             except Exception as e:
                 logger.warning(f"Failed to delete temp file {file_path}: {e}")
                 
-        # Prune ephemeral database & Elasticsearch candidate records
+        # Prune ephemeral database candidate records
         if settings.ENABLE_ONLINE_RETRIEVAL:
             try:
                 from app.services.online_retriever import OnlineRetrieverService

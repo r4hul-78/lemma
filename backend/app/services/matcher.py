@@ -9,8 +9,8 @@ from sentence_transformers import SentenceTransformer
 from app.config import settings
 from app.services.segmenter import SentenceSegmenterService
 from app.services.database import DatabaseService
-from app.services.elasticsearch_client import (
-    initialize_es,
+from app.services.lexical_search import (
+    initialize_lexical_index,
     index_sentence_bulk,
     search_sentences_bm25
 )
@@ -68,7 +68,7 @@ def search_sentences_semantic(query_vector: list[float], k: int = 20, job_id: st
 
 
 def seed_database():
-    """Seeds PostgreSQL and Elasticsearch from the mock JSON references file if empty."""
+    """Seeds PostgreSQL from the mock JSON references file if empty."""
     DatabaseService.initialize_db()
     
     # Check if database is already seeded
@@ -86,9 +86,6 @@ def seed_database():
         
     with open(settings.MOCK_DATABASE_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
-        
-    # Initialize Elasticsearch index
-    initialize_es()
     
     flat_sentences = []
     
@@ -121,13 +118,10 @@ def seed_database():
     for s, emb in zip(flat_sentences, embeddings):
         s["embedding"] = emb.tolist()
         
-    # Dual-Write Pattern:
-    # 1. Write to PostgreSQL (relational metadata + vectors)
+    # Single write to PostgreSQL — tsvector column is auto-generated,
+    # so this covers both semantic (pgvector) and lexical (tsvector) indexing.
     DatabaseService.insert_reference_sentences(flat_sentences)
-    
-    # 2. Write to Elasticsearch (document_id, sentence_index, text)
-    index_sentence_bulk(flat_sentences)
-    logger.info("Database and Elasticsearch seeded successfully.")
+    logger.info("Database seeded successfully (tsvector + pgvector).")
 
 
 def load_references() -> list[dict]:
@@ -169,12 +163,12 @@ def load_references() -> list[dict]:
 
 
 class LexicalMatcher:
-    """Detects verbatim or near-verbatim copy-paste text using Elasticsearch BM25."""
+    """Detects verbatim or near-verbatim copy-paste text using Postgres full-text search."""
     def __init__(self, references: list[dict] = None):
         self.references = references
 
     def find_match(self, query_text: str, threshold: float = None, job_id: str = None) -> dict | None:
-        """Compares query_text against reference sentences using Elasticsearch BM25."""
+        """Compares query_text against reference sentences using Postgres tsvector + pg_trgm."""
         if threshold is None:
             threshold = settings.LEXICAL_THRESHOLD
             
@@ -314,18 +308,18 @@ class DualTierMatcher:
 
         if match_type == "lexical":
             # Run ONLY lexical matching
-            es_results = search_sentences_bm25(query_sentence, k=20, job_id=job_id)
+            es_results = search_sentences_bm25(query_sentence, k=40, job_id=job_id)
         elif match_type == "semantic":
             # Run ONLY semantic matching
             model = SemanticMatcher.get_model()
             query_embedding = model.encode(query_sentence, show_progress_bar=False).tolist()
-            semantic_results = search_sentences_semantic(query_embedding, k=20, job_id=job_id)
+            semantic_results = search_sentences_semantic(query_embedding, k=40, job_id=job_id)
         else:
             # Run hybrid matching (both)
-            es_results = search_sentences_bm25(query_sentence, k=20, job_id=job_id)
+            es_results = search_sentences_bm25(query_sentence, k=40, job_id=job_id)
             model = SemanticMatcher.get_model()
             query_embedding = model.encode(query_sentence, show_progress_bar=False).tolist()
-            semantic_results = search_sentences_semantic(query_embedding, k=20, job_id=job_id)
+            semantic_results = search_sentences_semantic(query_embedding, k=40, job_id=job_id)
             
         if not es_results and not semantic_results:
             return None
@@ -374,7 +368,7 @@ class DualTierMatcher:
                     "rrf_score": 1.0 / (k + rank)
                 }
                 
-        # Resolve document metadata for candidates found only in ES
+        # Resolve document metadata for candidates found only in lexical search
         missing_doc_ids = [
             key[0] for key, cand in candidates.items()
             if "title" not in cand
@@ -416,7 +410,7 @@ class DualTierMatcher:
         
         # Classify Match Type:
         # If present in both, it's hybrid
-        # If only in ES, it's lexical
+        # If only in lexical search, it's lexical
         # If only in pgvector, it's semantic
         if best["es_rank"] is not None and best["semantic_rank"] is not None:
             match_type = "hybrid"
@@ -425,23 +419,28 @@ class DualTierMatcher:
         else:
             match_type = "semantic"
             
-        # Validate match against thresholds to prevent false positives and correctly handle single-source matches
+        # Validate match against thresholds to prevent false negatives and correctly handle single-source matches
         is_valid = False
+        es_score = best.get("es_score") or 0.0
+        sem_score = best.get("semantic_score")
+        
         if match_type == "hybrid":
-            if normalized_rrf >= settings.HYBRID_THRESHOLD:
-                if (best["semantic_score"] is not None and best["semantic_score"] >= semantic_threshold) or (lexical_sim >= lexical_threshold):
-                    is_valid = True
+            if (normalized_rrf >= settings.HYBRID_THRESHOLD) or \
+               (sem_score is not None and sem_score >= semantic_threshold) or \
+               (es_score >= 0.35) or \
+               (lexical_sim >= lexical_threshold):
+                is_valid = True
         elif match_type == "lexical":
-            if lexical_sim >= lexical_threshold:
+            if (lexical_sim >= lexical_threshold) or (es_score >= 0.35):
                 is_valid = True
         elif match_type == "semantic":
-            if best["semantic_score"] is not None and best["semantic_score"] >= semantic_threshold:
+            if (sem_score is not None and sem_score >= semantic_threshold):
                 is_valid = True
                 
         if not is_valid:
             # [DEBUG-SECTION]
             log_matcher_decision(query_sentence, match_type=None, score=normalized_rrf, matched_text=best["text"],
-                thresholds={"lexical": lexical_threshold, "semantic": semantic_threshold, "hybrid": settings.HYBRID_THRESHOLD, "actual_lexical_sim": round(lexical_sim, 4), "actual_semantic": round(best.get("semantic_score") or 0, 4)})
+                thresholds={"lexical": lexical_threshold, "semantic": semantic_threshold, "hybrid": settings.HYBRID_THRESHOLD, "actual_lexical_sim": round(lexical_sim, 4), "actual_semantic": round(best.get("semantic_score") or 0, 4), "es_score": round(es_score, 4)})
             # [/DEBUG-SECTION]
             return None
             

@@ -84,6 +84,7 @@ class LLMService:
             "model": model_to_use,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": settings.OLLAMA_KEEP_ALIVE,
             "options": {
                 "temperature": temp,
                 "presence_penalty": presence_penalty,
@@ -170,6 +171,7 @@ class LLMService:
             "model": model_to_use,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": settings.OLLAMA_KEEP_ALIVE,
             "options": {
                 "temperature": 0.1,
                 "top_p": 0.9,

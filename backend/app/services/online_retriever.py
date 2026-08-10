@@ -7,7 +7,6 @@ from collections import Counter
 from app.config import settings
 from app.services.segmenter import SentenceSegmenterService
 from app.services.database import DatabaseService
-from app.services.elasticsearch_client import get_es_client, index_sentence_bulk
 from app.services.matcher import SemanticMatcher
 
 logger = logging.getLogger(__name__)
@@ -121,31 +120,46 @@ class OnlineRetrieverService:
     @classmethod
     def extract_search_queries_from_profile(cls, profile) -> list[str]:
         """
-        Generates search queries directly from a TopicProfile object.
-
-        Falls back to profile.search_queries if available, otherwise
-        uses topics and keywords to construct queries.
+        Generates search queries directly from a TopicProfile object,
+        prioritizing exact paper title/heading phrases to find exact matches online.
         """
-        if profile.search_queries:
-            return profile.search_queries
-
         queries = []
+        
+        # Include first ~12 words of abstract (contains paper title/topic)
+        if profile.abstract_text:
+            first_line = profile.abstract_text.strip().split("\n")[0]
+            words = [w for w in first_line.split() if len(w) > 2][:12]
+            if len(words) >= 3:
+                queries.append(" ".join(words))
+
+        if profile.search_queries:
+            for q in profile.search_queries:
+                if q not in queries:
+                    queries.append(q)
+
         if profile.topics:
-            queries.append(profile.topics[0])
+            if profile.topics[0] not in queries:
+                queries.append(profile.topics[0])
             if len(profile.topics) >= 2:
-                queries.append(f"{profile.topics[0]} {profile.topics[1]}")
+                q2 = f"{profile.topics[0]} {profile.topics[1]}"
+                if q2 not in queries:
+                    queries.append(q2)
+
         if profile.keywords:
             for kw in profile.keywords:
-                if kw not in queries and len(queries) < 5:
+                if kw not in queries and len(queries) < 6:
                     queries.append(kw)
-        return queries[:5]
+
+        return queries[:6]
 
     @classmethod
     async def fetch_arxiv_candidates(cls, query: str, limit: int = 15) -> list[dict]:
         """Queries the arXiv API for matching academic preprints with retries."""
         url = "https://export.arxiv.org/api/query"
+        # Sanitize query for arXiv API syntax
+        clean_query = query.replace('"', '').replace("'", "")
         params = {
-            "search_query": f'all:"{query}"',
+            "search_query": f'all:{clean_query}',
             "max_results": limit
         }
         
@@ -245,9 +259,9 @@ class OnlineRetrieverService:
                         for paper in papers:
                             paper_id = paper.get("paperId")
                             title = paper.get("title")
-                            abstract = paper.get("abstract")
+                            abstract = paper.get("abstract") or title
                             
-                            if not paper_id or not title or not abstract:
+                            if not paper_id or not title:
                                 continue
                                 
                             authors = [auth.get("name") for auth in paper.get("authors", []) if auth.get("name")]
@@ -325,7 +339,7 @@ class OnlineRetrieverService:
                             abstract = re.sub(r"<[^>]+>", "", abstract).strip()
 
                         if not abstract:
-                            continue
+                            abstract = title
 
                         authors_raw = item.get("author", [])
                         author_parts = []
@@ -425,46 +439,113 @@ class OnlineRetrieverService:
             logger.error(f"Failed to fetch candidates from CORE for query '{query}': {e}")
             return []
 
-    @classmethod
-    async def download_fulltext_pdf(cls, pdf_url: str) -> str | None:
+    @staticmethod
+    def _validate_pdf_bytes(content: bytes, pdf_url: str) -> bool:
         """
-        Downloads and extracts text from an open-access PDF.
+        Validates the integrity of downloaded PDF bytes before passing them
+        to the extraction pipeline. Catches corrupted, truncated, or
+        non-PDF responses that would silently degrade match accuracy.
+
+        Checks:
+        1. Non-zero file size
+        2. Reasonable upper bound (< 200 MB)
+        3. PDF header magic bytes (%PDF-)
+        4. PDF EOF marker (%%EOF)
+        """
+        if not content or len(content) == 0:
+            logger.warning(f"PDF validation failed: empty content from {pdf_url}")
+            return False
+
+        # Upper bound sanity check (200 MB)
+        if len(content) > 200 * 1024 * 1024:
+            logger.warning(f"PDF validation failed: file too large ({len(content)} bytes) from {pdf_url}")
+            return False
+
+        # Minimum viable PDF size (~67 bytes for an empty PDF)
+        if len(content) < 64:
+            logger.warning(f"PDF validation failed: file too small ({len(content)} bytes) from {pdf_url}")
+            return False
+
+        # PDF header magic bytes
+        if not content[:5] == b"%PDF-":
+            logger.warning(f"PDF validation failed: missing PDF header magic bytes from {pdf_url}")
+            return False
+
+        # PDF EOF marker — check the last 1024 bytes for %%EOF
+        tail = content[-1024:]
+        if b"%%EOF" not in tail:
+            logger.warning(f"PDF validation failed: missing %%EOF marker from {pdf_url}")
+            return False
+
+        return True
+
+    @classmethod
+    async def download_fulltext_pdf(cls, pdf_url: str, max_retries: int = 3) -> str | None:
+        """
+        Downloads and extracts text from an open-access PDF with integrity
+        validation and retry-with-backoff on failure.
+
+        Validation is performed immediately after download. On failure,
+        the download is retried up to max_retries times with exponential
+        backoff. Only validated PDFs reach the text extraction pipeline.
 
         Returns the extracted full text, or None on failure.
         """
         if not pdf_url:
             return None
 
-        try:
-            async with httpx.AsyncClient(
-                timeout=float(settings.FULLTEXT_DOWNLOAD_TIMEOUT),
-                follow_redirects=True,
-            ) as client:
-                response = await client.get(pdf_url)
-                if response.status_code != 200:
-                    logger.warning(f"PDF download returned status {response.status_code} for {pdf_url}")
-                    return None
+        backoff_base = 1.5
 
-                content_type = response.headers.get("content-type", "")
-                if "pdf" not in content_type.lower() and not pdf_url.lower().endswith(".pdf"):
-                    logger.warning(f"Response is not a PDF ({content_type}) for {pdf_url}")
-                    return None
-
-                # Extract text using the existing extractor
-                from app.services.extractor import DocumentExtractorService, ExtractionError
-                try:
-                    text = DocumentExtractorService._extract_pdf(response.content)
-                    if text and len(text.strip()) > 100:
-                        return text.strip()
-                    else:
-                        logger.warning(f"Extracted text too short from PDF: {pdf_url}")
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with httpx.AsyncClient(
+                    timeout=float(settings.FULLTEXT_DOWNLOAD_TIMEOUT),
+                    follow_redirects=True,
+                ) as client:
+                    response = await client.get(pdf_url)
+                    if response.status_code != 200:
+                        logger.warning(f"PDF download returned status {response.status_code} for {pdf_url} (attempt {attempt}/{max_retries})")
+                        if attempt < max_retries:
+                            wait = backoff_base * (2 ** (attempt - 1))
+                            await asyncio.sleep(wait)
+                            continue
                         return None
-                except ExtractionError as e:
-                    logger.warning(f"Failed to extract text from downloaded PDF {pdf_url}: {e}")
-                    return None
-        except Exception as e:
-            logger.warning(f"Failed to download PDF from {pdf_url}: {e}")
-            return None
+
+                    # Validate PDF integrity before extraction (checks %PDF- magic bytes and %EOF)
+                    if not cls._validate_pdf_bytes(response.content, pdf_url):
+                        logger.warning(f"PDF integrity check failed for {pdf_url} (attempt {attempt}/{max_retries})")
+                        if attempt < max_retries:
+                            wait = backoff_base * (2 ** (attempt - 1))
+                            await asyncio.sleep(wait)
+                            continue
+                        logger.error(f"PDF quarantined after {max_retries} failed attempts: {pdf_url}")
+                        return None
+
+                    # Extract text using the existing extractor
+                    from app.services.extractor import DocumentExtractorService, ExtractionError
+                    try:
+                        text = DocumentExtractorService._extract_pdf(response.content)
+                        if text and len(text.strip()) > 100:
+                            return text.strip()
+                        else:
+                            logger.warning(f"Extracted text too short from PDF: {pdf_url}")
+                            return None
+                    except ExtractionError as e:
+                        logger.warning(f"Failed to extract text from downloaded PDF {pdf_url}: {e}")
+                        return None
+
+            except httpx.TimeoutException:
+                logger.warning(f"PDF download timed out for {pdf_url} (attempt {attempt}/{max_retries})")
+                if attempt < max_retries:
+                    wait = backoff_base * (2 ** (attempt - 1))
+                    await asyncio.sleep(wait)
+                    continue
+                return None
+            except Exception as e:
+                logger.warning(f"Failed to download PDF from {pdf_url}: {e}")
+                return None
+
+        return None
 
     @classmethod
     async def get_online_candidates(cls, queries: list[str], limit_per_query: int = None) -> list[dict]:
@@ -575,7 +656,8 @@ class OnlineRetrieverService:
     @classmethod
     async def seed_ephemeral_candidates(cls, job_id: str, candidates: list[dict]) -> None:
         """
-        Embeds, segments, and writes candidates to PostgreSQL and Elasticsearch using job-isolated IDs.
+        Embeds, segments, and writes candidates to PostgreSQL using job-isolated IDs.
+        The tsvector column handles lexical indexing automatically.
         """
         if not candidates:
             return
@@ -622,22 +704,21 @@ class OnlineRetrieverService:
             logger.error(f"Failed to generate embeddings for ephemeral sentences: {e}")
             return
 
-        # 3. Dual-Write to PostgreSQL and Elasticsearch
+        # 3. Write to PostgreSQL (tsvector column auto-populates for lexical search)
         try:
             DatabaseService.insert_reference_sentences(flat_sentences)
-            index_sentence_bulk(flat_sentences)
-            logger.info(f"Successfully cached {len(flat_sentences)} sentences locally for job: {job_id}")
+            logger.info(f"Successfully cached {len(flat_sentences)} sentences in PostgreSQL for job: {job_id}")
         except Exception as e:
-            logger.error(f"Dual-Write caching failed for job {job_id}: {e}")
+            logger.error(f"PostgreSQL caching failed for job {job_id}: {e}")
 
     @classmethod
     def prune_cache(cls, job_id: str) -> None:
         """
-        Deletes all PostgreSQL and Elasticsearch candidate records associated with the specified job_id.
+        Deletes all PostgreSQL candidate records associated with the specified job_id.
+        CASCADE foreign key automatically removes associated sentences.
         """
         logger.info(f"Pruning ephemeral cache for job: {job_id}")
         
-        # 1. Prune from PostgreSQL
         try:
             with DatabaseService.get_connection() as conn:
                 with conn.cursor() as cursor:
@@ -647,23 +728,4 @@ class OnlineRetrieverService:
             logger.info(f"Pruned PostgreSQL records for job {job_id}")
         except Exception as e:
             logger.error(f"Failed to prune PostgreSQL cache for job {job_id}: {e}")
-
-        # 2. Prune from Elasticsearch
-        try:
-            es = get_es_client()
-            index_name = "reference_sentences"
-            if es.indices.exists(index=index_name):
-                query = {
-                    "query": {
-                        "prefix": {
-                            "document_id": f"job_{job_id}_"
-                        }
-                    }
-                }
-                res = es.delete_by_query(index=index_name, body=query)
-                es.indices.refresh(index=index_name)
-                deleted = res.get("deleted", 0)
-                logger.info(f"Pruned {deleted} Elasticsearch sentences for job {job_id}")
-        except Exception as e:
-            logger.error(f"Failed to prune Elasticsearch cache for job {job_id}: {e}")
 

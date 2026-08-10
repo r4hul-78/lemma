@@ -91,9 +91,30 @@ class DocumentExtractorService:
         except Exception as e:
             raise ExtractionError(f"Corrupted or invalid DOCX document: {str(e)}") from e
 
-    @staticmethod
-    def _extract_pdf(content: bytes) -> str:
-        """Extracts text from PDF bytes using pypdf."""
+    @classmethod
+    def _clean_pdf_text(cls, text: str) -> str:
+        """
+        Cleans raw extracted PDF text by rejoining hyphenated words split across lines
+        and joining single line breaks inside paragraphs.
+        """
+        if not text:
+            return ""
+
+        import re
+        # Rejoin hyphenated words split across line breaks (e.g. "transfor-\nmer" -> "transformer")
+        text = re.sub(r'(\w+)-\n(\w+)', r'\1\2', text)
+        
+        # Replace single newlines within paragraphs with a space, while preserving double newlines
+        text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
+        
+        # Remove redundant inline spaces
+        text = re.sub(r'[ \t]+', ' ', text)
+        
+        return text.strip()
+
+    @classmethod
+    def _extract_pdf(cls, content: bytes) -> str:
+        """Extracts text from PDF bytes using pypdf and applies text cleaning."""
         try:
             pdf_file = io.BytesIO(content)
             reader = PdfReader(pdf_file)
@@ -109,7 +130,9 @@ class DocumentExtractorService:
             for i, page in enumerate(reader.pages):
                 page_text = page.extract_text()
                 if page_text:
-                    text_pages.append(page_text)
+                    cleaned_page = cls._clean_pdf_text(page_text)
+                    if cleaned_page:
+                        text_pages.append(cleaned_page)
                     
             if not text_pages:
                 raise ExtractionError("No extractable text found in PDF (scanned/image-only PDFs are not supported).")

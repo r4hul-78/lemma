@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from app.services.online_retriever import OnlineRetrieverService
 from app.services.database import DatabaseService
-from app.services.elasticsearch_client import get_es_client
+
 
 # Mock arXiv XML response
 MOCK_ARXIV_XML = """<?xml version="1.0" encoding="utf-8"?>
@@ -139,17 +139,6 @@ async def test_seed_and_prune_ephemeral_candidates():
             count = cursor.fetchone()[0]
             assert count == 2
 
-    # Verify sentences exist in Elasticsearch
-    es = get_es_client()
-    index_name = "reference_sentences"
-    res = es.search(index=index_name, body={
-        "query": {
-            "prefix": {
-                "document_id": f"job_{job_id}_"
-            }
-        }
-    })
-    assert res["hits"]["total"]["value"] == 2
 
     # Prune candidates
     OnlineRetrieverService.prune_cache(job_id)
@@ -161,13 +150,3 @@ async def test_seed_and_prune_ephemeral_candidates():
             assert cursor.fetchone()[0] == 0
             cursor.execute("SELECT COUNT(*) FROM sentences WHERE document_id = %s;", (f"job_{job_id}_test_doc_a",))
             assert cursor.fetchone()[0] == 0
-
-    # Verify records deleted in Elasticsearch
-    res = es.search(index=index_name, body={
-        "query": {
-            "prefix": {
-                "document_id": f"job_{job_id}_"
-            }
-        }
-    })
-    assert res["hits"]["total"]["value"] == 0
