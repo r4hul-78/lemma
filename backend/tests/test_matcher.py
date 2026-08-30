@@ -144,3 +144,18 @@ def test_dual_tier_matcher_integration():
     for hl in m2["highlights"]:
         assert hl["start_char"] >= sentences[2]["start_char"]
         assert hl["end_char"] <= sentences[2]["end_char"]
+
+
+def test_dual_tier_matcher_rejects_unrelated_sentence():
+    matcher = DualTierMatcher()
+
+    unrelated = "In this paper, we present a novel approach to local file indexing."
+
+    match = matcher.analyze_sentence(
+        unrelated,
+        lexical_threshold=0.7,
+        semantic_threshold=0.55,
+        match_type="hybrid"
+    )
+
+    assert match is None
