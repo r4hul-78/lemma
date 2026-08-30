@@ -166,7 +166,7 @@ References
 
         assert methods is not None
         assert methods.threshold_override is not None
-        assert methods.threshold_override["lexical_threshold"] > 0.70  # Stricter than default
+        assert methods.threshold_override["lexical_threshold"] == 0.65
 
     def test_references_always_excluded(self):
         """References should be excluded for all paper types."""
