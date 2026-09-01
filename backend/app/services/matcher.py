@@ -424,12 +424,11 @@ class DualTierMatcher:
         es_score = best.get("es_score") or 0.0
         sem_score = best.get("semantic_score")
         
-        if match_type == "hybrid":
-            if (normalized_rrf >= settings.HYBRID_THRESHOLD) or \
-               (sem_score is not None and sem_score >= semantic_threshold) or \
-               (es_score >= 0.35) or \
-               (lexical_sim >= lexical_threshold):
-                is_valid = True
+        if normalized_rrf >= settings.HYBRID_THRESHOLD and (
+            (sem_score is not None and sem_score >= semantic_threshold) or
+            (lexical_sim >= lexical_threshold)
+        ):
+            is_valid = True
         elif match_type == "lexical":
             if (lexical_sim >= lexical_threshold) or (es_score >= 0.35):
                 is_valid = True

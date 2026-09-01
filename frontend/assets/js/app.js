@@ -135,10 +135,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const hOllamaDot = document.getElementById("health-ollama-dot");
         const hOllamaText = document.getElementById("health-ollama-text");
 
-        const hEs = document.getElementById("health-es");
-        const hEsDot = document.getElementById("health-es-dot");
-        const hEsText = document.getElementById("health-es-text");
-
         const hDb = document.getElementById("health-db");
         const hDbDot = document.getElementById("health-db-dot");
         const hDbText = document.getElementById("health-db-text");
@@ -147,15 +143,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const hCeleryDot = document.getElementById("health-celery-dot");
         const hCeleryText = document.getElementById("health-celery-text");
 
-        if (!hOllama || !hEs || !hDb || !hCelery) return;
-
+        if (!hOllama || !hDb || !hCelery) return;
         // Force working status during job performance to keep UI clean and accurate
         if (isAnalyzing || isParaphrasing) {
             if (isAnalyzing) {
                 hDb.className = "health-item working-orange";
                 hDbText.textContent = "Working";
-                hEs.className = "health-item working-orange";
-                hEsText.textContent = "Working";
                 hCelery.className = "health-item working-orange";
                 hCeleryText.textContent = "Working";
             }
@@ -185,20 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     hOllamaText.textContent = "Offline";
                 }
 
-                // 2. Elasticsearch status
-                const es = services.elasticsearch || {};
-                if (es.status === "healthy") {
-                    hEs.className = "health-item healthy-green";
-                    hEsText.textContent = "Healthy";
-                } else if (es.status === "unhealthy") {
-                    hEs.className = "health-item working-orange";
-                    hEsText.textContent = "Degraded";
-                } else {
-                    hEs.className = "health-item offline-red";
-                    hEsText.textContent = "Offline";
-                }
-
-                // 3. PostgreSQL Database status
+                // 2. PostgreSQL Database status
                 const db = services.database || {};
                 if (db.status === "connected") {
                     hDb.className = "health-item connected-green";
@@ -208,7 +188,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     hDbText.textContent = "Offline";
                 }
 
-                // 4. Celery Queue status (Idle vs Working)
+                // 3. Celery Queue status (Idle vs Working)
                 const celery = services.celery || {};
                 const isFrontendRunningJob = (currentJobId !== null && uploadResponseData === null);
                 if (isFrontendRunningJob || celery.status === "working") {
@@ -227,7 +207,6 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (error) {
             console.error("Health footer check failed:", error);
             hOllama.className = "health-item offline-red"; hOllamaText.textContent = "Offline";
-            hEs.className = "health-item offline-red"; hEsText.textContent = "Offline";
             hDb.className = "health-item offline-red"; hDbText.textContent = "Offline";
             hCelery.className = "health-item offline-red"; hCeleryText.textContent = "Offline";
         }
@@ -1044,7 +1023,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else if (tabId === "nav-support") {
                         title = "Help & Support Center";
                         iconClass = "fa-circle-question";
-                        desc = "Troubleshoot local engine setups (Ollama, PostgreSQL, Elasticsearch) and read keyboard shortcuts guides.";
+                        desc = "Troubleshoot local engine setups (Ollama, PostgreSQL) and read keyboard shortcuts guides.";
                         sprint = "Sprint 1";
                     }
 
